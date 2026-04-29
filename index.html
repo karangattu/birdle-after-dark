@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Birdle After Dark</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- Orientation Warning -->
+    <div id="orientation-warning">
+      <div class="warning-content">
+        <h2>Please Rotate Your Device</h2>
+        <p>This game must be played in landscape mode.</p>
+      </div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="screen active">
+      <div class="poster-container">
+        <img src="/assets/game_poster.png" alt="Birdle After Dark Poster" class="poster-img" />
+      </div>
+      <div class="start-content">
+        <h1>Birdle After Dark</h1>
+        <p>Find 4 nocturnal birds in the dark forest before time runs out!</p>
+        <button id="start-btn" class="primary-btn">Start Game</button>
+      </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="screen">
+      <div id="game-container">
+        <img src="/assets/forest.jpg" alt="Dark Forest" id="forest-bg" />
+        
+        <!-- Birds -->
+        <img src="/assets/great_horned_owl.png" alt="Great Horned Owl" class="bird hidden-bird" id="great_horned_owl" />
+        <img src="/assets/western_screech_owl.png" alt="Western Screech Owl" class="bird hidden-bird" id="western_screech_owl" />
+        <img src="/assets/barn_owl.png" alt="Barn Owl" class="bird hidden-bird" id="barn_owl" />
+        <img src="/assets/common_poorwill.png" alt="Common Poorwill" class="bird hidden-bird" id="common_poorwill" />
+        
+        <!-- Darkness overlay acting as flashlight mask -->
+        <div id="darkness-overlay"></div>
+        
+        <!-- Flashlight Hand Image (follows cursor) -->
+        <img src="/assets/hand_with_flashlight.png" alt="Hand with flashlight" id="flashlight-hand" />
+      </div>
+
+      <!-- HUD: Top -->
+      <div id="hud-top">
+        <div id="timer">1:00</div>
+        <div id="checklist">
+          <h3>Birds Found (<span id="birds-found-count">0</span>/4)</h3>
+          <ul>
+            <li id="check-great_horned_owl">Great Horned Owl</li>
+            <li id="check-western_screech_owl">Western Screech Owl</li>
+            <li id="check-barn_owl">Barn Owl</li>
+            <li id="check-common_poorwill">Common Poorwill</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- HUD: Bottom -->
+      <div id="hud-bottom">
+        <button id="register-btn" class="action-btn">Register Bird</button>
+      </div>
+
+      <!-- Guessing Modal -->
+      <div id="guess-modal" class="hidden">
+        <div class="guess-content">
+          <h2>Which bird did you find?</h2>
+          <div class="guess-options">
+            <button class="guess-btn" data-bird="great_horned_owl">Great Horned Owl</button>
+            <button class="guess-btn" data-bird="western_screech_owl">Western Screech Owl</button>
+            <button class="guess-btn" data-bird="barn_owl">Barn Owl</button>
+            <button class="guess-btn" data-bird="common_poorwill">Common Poorwill</button>
+          </div>
+          <p id="guess-feedback" class="hidden">Incorrect! -5 Seconds Penalty.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- End Screen -->
+    <div id="end-screen" class="screen">
+      <div class="end-content">
+        <h1 id="end-title">Game Over</h1>
+        <p id="end-message">You ran out of time.</p>
+        <button id="restart-btn" class="primary-btn">Play Again</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

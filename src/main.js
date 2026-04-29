@@ -81,10 +81,12 @@ function endGame(result) {
   endScreen.classList.add('active');
   
   if (result === 'win') {
+    if (navigator.vibrate) navigator.vibrate([100, 100, 100, 100, 500]); // Victory pattern
     endTitle.innerText = "You Won!";
     endTitle.style.color = "#00ffcc";
     endMessage.innerText = `You found all the birds with ${timeRemaining} seconds left.`;
   } else {
+    if (navigator.vibrate) navigator.vibrate([300]); // Long buzz for loss
     endTitle.innerText = "Game Over";
     endTitle.style.color = "#ff3333";
     endMessage.innerText = "You ran out of time. The birds remain hidden.";
@@ -139,6 +141,7 @@ guessBtns.forEach(btn => {
     
     if (guessedBird === currentBirdTarget) {
       // Correct guess
+      if (navigator.vibrate) navigator.vibrate(100); // Short buzz
       isGuessing = false;
       guessModal.classList.add('hidden');
       foundBirds.add(currentBirdTarget);
@@ -154,6 +157,7 @@ guessBtns.forEach(btn => {
       }
     } else {
       // Incorrect guess
+      if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100]); // Warning buzz
       guessFeedback.classList.remove('hidden');
       timeRemaining -= 5;
       

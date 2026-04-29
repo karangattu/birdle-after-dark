@@ -55,8 +55,18 @@ body {
 .start-content {
   position: absolute;
   bottom: 5%;
-  width: 90%;
-  max-width: 400px;
+  right: 5%;
+  left: auto;
+  width: fit-content;
+  max-width: min(90vw, 400px);
+}
+
+@media screen and (max-width: 768px) {
+  .start-content {
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+  }
 }
 
 h1 {

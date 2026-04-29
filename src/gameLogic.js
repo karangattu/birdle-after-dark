@@ -82,3 +82,42 @@ export function isTapInteraction(startPosition, endPosition, maxDistance = 12) {
 
   return dx * dx + dy * dy <= maxDistance * maxDistance;
 }
+
+/**
+ * Calculates where to render the spotlight and flashlight hand.
+ * Mouse keeps direct spotlight control. Touch keeps the finger on the hand and
+ * offsets the spotlight upward so the highlighted area remains visible.
+ * @param {number} controlX - The pointer x coordinate.
+ * @param {number} controlY - The pointer y coordinate.
+ * @param {'mouse'|'touch'} controlMode - The active control mode.
+ * @param {{width: number, height: number}} handSize - Rendered hand image size.
+ * @returns {{spotlightX: number, spotlightY: number, handX: number, handY: number}}
+ */
+export function getFlashlightPositions(
+  controlX,
+  controlY,
+  controlMode,
+  handSize,
+) {
+  const handWidth = handSize?.width ?? 300;
+  const handHeight = handSize?.height ?? 164;
+
+  if (controlMode === 'touch') {
+    const handX = controlX - handWidth * (185 / 300);
+    const handY = controlY - handHeight * (125 / 164);
+
+    return {
+      spotlightX: controlX - handWidth * (31 / 300),
+      spotlightY: controlY - handHeight * (66 / 164),
+      handX,
+      handY,
+    };
+  }
+
+  return {
+    spotlightX: controlX,
+    spotlightY: controlY,
+    handX: controlX - handWidth * (100 / 300),
+    handY: controlY + handHeight * (50 / 164),
+  };
+}

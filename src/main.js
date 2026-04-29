@@ -1,6 +1,7 @@
 import {
   checkBirdFound,
   getEndGamePresentation,
+  getFlashlightPositions,
   isGameOver,
   isTapInteraction,
 } from './gameLogic.js';
@@ -41,6 +42,7 @@ let currentBirdTarget = null;
 let activePointerId = null;
 let pointerDownPosition = null;
 let endGameTimeout = null;
+let currentControlMode = 'mouse';
 
 // Initialize birds info
 const birdIds = ['great_horned_owl', 'western_screech_owl', 'barn_owl', 'common_poorwill'];
@@ -61,17 +63,46 @@ function getGameViewportCenter() {
   };
 }
 
-function updateFlashlight(x, y) {
+function getHandRenderSize() {
+  const rect = flashlightHand.getBoundingClientRect();
+
+  if (rect.width && rect.height) {
+    return {
+      width: rect.width,
+      height: rect.height,
+    };
+  }
+
+  const fallbackWidth = 300;
+  const naturalWidth = flashlightHand.naturalWidth || 2816;
+  const naturalHeight = flashlightHand.naturalHeight || 1536;
+
+  return {
+    width: fallbackWidth,
+    height: fallbackWidth * (naturalHeight / naturalWidth),
+  };
+}
+
+function updateFlashlight(x, y, controlMode = currentControlMode) {
   if (!isPlaying) return;
-  currentMouseX = x;
-  currentMouseY = y;
+  currentControlMode = controlMode;
+
+  const positions = getFlashlightPositions(
+    x,
+    y,
+    controlMode,
+    getHandRenderSize(),
+  );
+
+  currentMouseX = positions.spotlightX;
+  currentMouseY = positions.spotlightY;
   
   // Update mask
-  darknessOverlay.style.background = `radial-gradient(circle at ${x}px ${y}px, transparent 40px, rgba(0,0,0,0.98) 60px)`;
+  darknessOverlay.style.background = `radial-gradient(circle at ${positions.spotlightX}px ${positions.spotlightY}px, transparent 40px, rgba(0,0,0,0.98) 60px)`;
   
   // Update hand position
-  flashlightHand.style.left = `${x}px`;
-  flashlightHand.style.top = `${y}px`;
+  flashlightHand.style.left = `${positions.handX}px`;
+  flashlightHand.style.top = `${positions.handY}px`;
 }
 
 function randomizeBirds() {
@@ -111,6 +142,7 @@ function startGameLogic() {
   currentBirdTarget = null;
   activePointerId = null;
   pointerDownPosition = null;
+  currentControlMode = 'mouse';
   guessModal.classList.add('hidden');
   guessFeedback.classList.add('hidden');
   
@@ -133,7 +165,7 @@ function startGameLogic() {
   gameScreen.classList.add('active');
 
   const centerPoint = getGameViewportCenter();
-  updateFlashlight(centerPoint.x, centerPoint.y);
+  updateFlashlight(centerPoint.x, centerPoint.y, 'mouse');
 
   // Start loop
   if (gameInterval) clearInterval(gameInterval);
@@ -261,6 +293,8 @@ function handlePointerDown(event) {
     return;
   }
 
+  const controlMode = event.pointerType === 'mouse' ? 'mouse' : 'touch';
+
   if (event.pointerType !== 'mouse') {
     event.preventDefault();
     activePointerId = event.pointerId;
@@ -272,7 +306,7 @@ function handlePointerDown(event) {
     y: event.clientY,
   };
 
-  updateFlashlight(event.clientX, event.clientY);
+  updateFlashlight(event.clientX, event.clientY, controlMode);
 }
 
 function handlePointerMove(event) {
@@ -288,7 +322,11 @@ function handlePointerMove(event) {
     event.preventDefault();
   }
 
-  updateFlashlight(event.clientX, event.clientY);
+  updateFlashlight(
+    event.clientX,
+    event.clientY,
+    event.pointerType === 'mouse' ? 'mouse' : 'touch'
+  );
 }
 
 function handlePointerUp(event) {
@@ -300,7 +338,11 @@ function handlePointerUp(event) {
     event.preventDefault();
   }
 
-  updateFlashlight(event.clientX, event.clientY);
+  updateFlashlight(
+    event.clientX,
+    event.clientY,
+    event.pointerType === 'mouse' ? 'mouse' : 'touch'
+  );
 
   const shouldRegister = isPlaying &&
     !isGuessing &&

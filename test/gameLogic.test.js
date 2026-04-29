@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   checkBirdFound,
   getEndGamePresentation,
+  getFlashlightPositions,
   isGameOver,
   isTapInteraction,
 } from '../src/gameLogic';
@@ -75,6 +76,30 @@ describe('gameLogic', () => {
 
     it('should treat a dragged touch as a drag instead of a tap', () => {
       expect(isTapInteraction({ x: 100, y: 100 }, { x: 130, y: 126 })).toBe(false);
+    });
+  });
+
+  describe('getFlashlightPositions', () => {
+    it('should keep mouse spotlight control centered on the pointer', () => {
+      expect(
+        getFlashlightPositions(200, 300, 'mouse', { width: 300, height: 164 })
+      ).toEqual({
+        spotlightX: 200,
+        spotlightY: 300,
+        handX: 100,
+        handY: 350,
+      });
+    });
+
+    it('should keep touch control on the hand while offsetting the spotlight above it', () => {
+      expect(
+        getFlashlightPositions(200, 300, 'touch', { width: 300, height: 164 })
+      ).toEqual({
+        spotlightX: 169,
+        spotlightY: 234,
+        handX: 15,
+        handY: 175,
+      });
     });
   });
 });

@@ -5,6 +5,7 @@ import {
   isGameOver,
   isTapInteraction,
 } from './gameLogic.js';
+import bgAudioSrc from '../assets/great_horned_owl.mp3';
 
 // DOM Elements
 const startScreen = document.getElementById('start-screen');
@@ -26,6 +27,8 @@ const transitionVideo = document.getElementById('transition-video');
 const guessModal = document.getElementById('guess-modal');
 const guessBtns = document.querySelectorAll('.guess-btn');
 const guessFeedback = document.getElementById('guess-feedback');
+
+bgAudio.src = bgAudioSrc;
 
 const GAME_DURATION = 60;
 const FLASHLIGHT_RADIUS = 40;

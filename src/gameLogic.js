@@ -38,3 +38,47 @@ export function isGameOver(timeRemaining, foundBirdsCount, totalBirds) {
   }
   return 'playing';
 }
+
+/**
+ * Gets the content and timing for the end-game presentation.
+ * @param {'win'|'loss'} result - Final game result.
+ * @param {number} timeRemaining - Seconds left on the clock.
+ * @returns {{title: string, titleColor: string, message: string, revealMissedBirds: boolean, endScreenDelayMs: number}}
+ */
+export function getEndGamePresentation(result, timeRemaining) {
+  if (result === 'win') {
+    return {
+      title: 'You Won!',
+      titleColor: '#00ffcc',
+      message: `You found all the birds with ${timeRemaining} seconds left.`,
+      revealMissedBirds: false,
+      endScreenDelayMs: 0,
+    };
+  }
+
+  return {
+    title: 'Game Over',
+    titleColor: '#ff3333',
+    message: 'You ran out of time.',
+    revealMissedBirds: true,
+    endScreenDelayMs: 3000,
+  };
+}
+
+/**
+ * Determines whether a pointer interaction stayed within tap distance.
+ * @param {{x: number, y: number} | null} startPosition - Pointer down position.
+ * @param {{x: number, y: number} | null} endPosition - Pointer up position.
+ * @param {number} maxDistance - Maximum distance that still counts as a tap.
+ * @returns {boolean}
+ */
+export function isTapInteraction(startPosition, endPosition, maxDistance = 12) {
+  if (!startPosition || !endPosition) {
+    return false;
+  }
+
+  const dx = endPosition.x - startPosition.x;
+  const dy = endPosition.y - startPosition.y;
+
+  return dx * dx + dy * dy <= maxDistance * maxDistance;
+}

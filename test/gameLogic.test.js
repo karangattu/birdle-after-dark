@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { checkBirdFound, isGameOver } from '../src/gameLogic';
+import {
+  checkBirdFound,
+  getEndGamePresentation,
+  isGameOver,
+  isTapInteraction,
+} from '../src/gameLogic';
 
 describe('gameLogic', () => {
   describe('checkBirdFound', () => {
@@ -38,6 +43,38 @@ describe('gameLogic', () => {
     it('should return loss if time is out and not all birds found', () => {
       expect(isGameOver(0, 3, 4)).toBe('loss');
       expect(isGameOver(-1, 0, 4)).toBe('loss');
+    });
+  });
+
+  describe('getEndGamePresentation', () => {
+    it('should configure the win screen without a delay', () => {
+      expect(getEndGamePresentation('win', 12)).toEqual({
+        title: 'You Won!',
+        titleColor: '#00ffcc',
+        message: 'You found all the birds with 12 seconds left.',
+        revealMissedBirds: false,
+        endScreenDelayMs: 0,
+      });
+    });
+
+    it('should configure the loss screen with a 3 second reveal delay', () => {
+      expect(getEndGamePresentation('loss', 0)).toEqual({
+        title: 'Game Over',
+        titleColor: '#ff3333',
+        message: 'You ran out of time.',
+        revealMissedBirds: true,
+        endScreenDelayMs: 3000,
+      });
+    });
+  });
+
+  describe('isTapInteraction', () => {
+    it('should treat a stationary touch as a tap', () => {
+      expect(isTapInteraction({ x: 100, y: 100 }, { x: 106, y: 104 })).toBe(true);
+    });
+
+    it('should treat a dragged touch as a drag instead of a tap', () => {
+      expect(isTapInteraction({ x: 100, y: 100 }, { x: 130, y: 126 })).toBe(false);
     });
   });
 });

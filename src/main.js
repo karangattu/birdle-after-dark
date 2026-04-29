@@ -1,9 +1,15 @@
-import { checkBirdFound, isGameOver } from './gameLogic.js';
+import {
+  checkBirdFound,
+  getEndGamePresentation,
+  isGameOver,
+  isTapInteraction,
+} from './gameLogic.js';
 
 // DOM Elements
 const startScreen = document.getElementById('start-screen');
 const gameScreen = document.getElementById('game-screen');
 const endScreen = document.getElementById('end-screen');
+const gameContainer = document.getElementById('game-container');
 const startBtn = document.getElementById('start-btn');
 const restartBtn = document.getElementById('restart-btn');
 const timerEl = document.getElementById('timer');
@@ -32,9 +38,28 @@ let currentMouseY = window.innerHeight / 2;
 let isPlaying = false;
 let isGuessing = false;
 let currentBirdTarget = null;
+let activePointerId = null;
+let pointerDownPosition = null;
+let endGameTimeout = null;
 
 // Initialize birds info
 const birdIds = ['great_horned_owl', 'western_screech_owl', 'barn_owl', 'common_poorwill'];
+
+function clearPendingEndGame() {
+  if (endGameTimeout) {
+    window.clearTimeout(endGameTimeout);
+    endGameTimeout = null;
+  }
+}
+
+function getGameViewportCenter() {
+  const rect = gameContainer.getBoundingClientRect();
+
+  return {
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2,
+  };
+}
 
 function updateFlashlight(x, y) {
   if (!isPlaying) return;
@@ -78,11 +103,14 @@ function startGame() {
 }
 
 function startGameLogic() {
+  clearPendingEndGame();
   timeRemaining = GAME_DURATION;
   foundBirds.clear();
   isPlaying = true;
   isGuessing = false;
   currentBirdTarget = null;
+  activePointerId = null;
+  pointerDownPosition = null;
   guessModal.classList.add('hidden');
   guessFeedback.classList.add('hidden');
   
@@ -97,12 +125,15 @@ function startGameLogic() {
   });
 
   randomizeBirds();
-  updateFlashlight(window.innerWidth / 2, window.innerHeight / 2);
 
   // Switch screens
   startScreen.classList.remove('active');
   endScreen.classList.remove('active');
+  videoScreen.classList.remove('active');
   gameScreen.classList.add('active');
+
+  const centerPoint = getGameViewportCenter();
+  updateFlashlight(centerPoint.x, centerPoint.y);
 
   // Start loop
   if (gameInterval) clearInterval(gameInterval);
@@ -113,34 +144,56 @@ function startGameLogic() {
   bgAudio.play().catch(err => console.log('Audio playback failed:', err));
 }
 
-function endGame(result) {
-  isPlaying = false;
-  clearInterval(gameInterval);
-  
-  bgAudio.pause();
-  
+function showEndScreen(presentation) {
   gameScreen.classList.remove('active');
   endScreen.classList.add('active');
+
+  endTitle.innerText = presentation.title;
+  endTitle.style.color = presentation.titleColor;
+  endMessage.innerText = presentation.message;
+}
+
+function revealMissedBirds() {
+  darknessOverlay.style.background = 'transparent';
+
+  birdIds.forEach(id => {
+    if (!foundBirds.has(id)) {
+      document.getElementById(id).classList.add('missed');
+    }
+  });
+}
+
+function endGame(result) {
+  clearPendingEndGame();
+  isPlaying = false;
+  isGuessing = false;
+  currentBirdTarget = null;
+  activePointerId = null;
+  pointerDownPosition = null;
+  clearInterval(gameInterval);
+  gameInterval = null;
+  guessModal.classList.add('hidden');
+  guessFeedback.classList.add('hidden');
   
+  bgAudio.pause();
+  const presentation = getEndGamePresentation(result, timeRemaining);
+
   if (result === 'win') {
     if (navigator.vibrate) navigator.vibrate([100, 100, 100, 100, 500]); // Victory pattern
-    endTitle.innerText = "You Won!";
-    endTitle.style.color = "#00ffcc";
-    endMessage.innerText = `You found all the birds with ${timeRemaining} seconds left.`;
-  } else {
-    if (navigator.vibrate) navigator.vibrate([300]); // Long buzz for loss
-    endTitle.innerText = "Game Over";
-    endTitle.style.color = "#ff3333";
-    endMessage.innerText = "You ran out of time. The birds you missed are highlighted.";
-    
-    // Reveal missed birds
-    darknessOverlay.style.background = 'transparent';
-    birdIds.forEach(id => {
-      if (!foundBirds.has(id)) {
-        document.getElementById(id).classList.add('missed');
-      }
-    });
+    showEndScreen(presentation);
+    return;
   }
+
+  if (navigator.vibrate) navigator.vibrate([300]); // Long buzz for loss
+
+  if (presentation.revealMissedBirds) {
+    revealMissedBirds();
+  }
+
+  endGameTimeout = window.setTimeout(() => {
+    endGameTimeout = null;
+    showEndScreen(presentation);
+  }, presentation.endScreenDelayMs);
 }
 
 function formatTime(seconds) {
@@ -185,6 +238,89 @@ function handleRegister() {
   }
 }
 
+function shouldIgnoreRegisterTarget(target) {
+  return target instanceof Element && Boolean(
+    target.closest('#guess-modal') || target.closest('#hud-top')
+  );
+}
+
+function releaseTrackedPointer(pointerId) {
+  if (
+    typeof pointerId === 'number' &&
+    gameContainer.hasPointerCapture?.(pointerId)
+  ) {
+    gameContainer.releasePointerCapture(pointerId);
+  }
+
+  activePointerId = null;
+  pointerDownPosition = null;
+}
+
+function handlePointerDown(event) {
+  if (!isPlaying || isGuessing || event.button !== 0) {
+    return;
+  }
+
+  if (event.pointerType !== 'mouse') {
+    event.preventDefault();
+    activePointerId = event.pointerId;
+    gameContainer.setPointerCapture?.(event.pointerId);
+  }
+
+  pointerDownPosition = {
+    x: event.clientX,
+    y: event.clientY,
+  };
+
+  updateFlashlight(event.clientX, event.clientY);
+}
+
+function handlePointerMove(event) {
+  if (!isPlaying || isGuessing) {
+    return;
+  }
+
+  if (event.pointerType !== 'mouse' && activePointerId !== event.pointerId) {
+    return;
+  }
+
+  if (event.pointerType !== 'mouse') {
+    event.preventDefault();
+  }
+
+  updateFlashlight(event.clientX, event.clientY);
+}
+
+function handlePointerUp(event) {
+  if (event.pointerType !== 'mouse' && activePointerId !== event.pointerId) {
+    return;
+  }
+
+  if (event.pointerType !== 'mouse') {
+    event.preventDefault();
+  }
+
+  updateFlashlight(event.clientX, event.clientY);
+
+  const shouldRegister = isPlaying &&
+    !isGuessing &&
+    isTapInteraction(pointerDownPosition, {
+      x: event.clientX,
+      y: event.clientY,
+    }) &&
+    !shouldIgnoreRegisterTarget(event.target);
+
+  releaseTrackedPointer(event.pointerId);
+
+  if (shouldRegister) {
+    handleRegister();
+  }
+}
+
+function handlePointerCancel(event) {
+  releaseTrackedPointer(event.pointerId);
+}
+
 guessBtns.forEach(btn => {
   btn.addEventListener('click', (e) => {
     const guessedBird = e.target.getAttribute('data-bird');
@@ -192,13 +328,15 @@ guessBtns.forEach(btn => {
     if (guessedBird === currentBirdTarget) {
       // Correct guess
       if (navigator.vibrate) navigator.vibrate(100); // Short buzz
+      const foundBirdId = currentBirdTarget;
       isGuessing = false;
+      currentBirdTarget = null;
       guessModal.classList.add('hidden');
-      foundBirds.add(currentBirdTarget);
+      foundBirds.add(foundBirdId);
       
       // Update UI
-      document.getElementById(currentBirdTarget).classList.add('found');
-      document.getElementById(`check-${currentBirdTarget}`).classList.add('found');
+      document.getElementById(foundBirdId).classList.add('found');
+      document.getElementById(`check-${foundBirdId}`).classList.add('found');
       birdsFoundCountEl.innerText = foundBirds.size;
       
       // Check win condition immediately
@@ -227,14 +365,10 @@ guessBtns.forEach(btn => {
 startBtn.addEventListener('click', startGame);
 restartBtn.addEventListener('click', startGame);
 
-gameScreen.addEventListener('click', (e) => {
-  if (e.target.closest('#guess-modal') || e.target.closest('#hud-top')) return;
-  handleRegister();
-});
-
-gameScreen.addEventListener('mousemove', (e) => {
-  updateFlashlight(e.clientX, e.clientY);
-});
+gameContainer.addEventListener('pointerdown', handlePointerDown);
+gameContainer.addEventListener('pointermove', handlePointerMove);
+gameContainer.addEventListener('pointerup', handlePointerUp);
+gameContainer.addEventListener('pointercancel', handlePointerCancel);
 
 // Initial update
 updateFlashlight(window.innerWidth / 2, window.innerHeight / 2);

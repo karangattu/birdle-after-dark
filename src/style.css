@@ -54,18 +54,18 @@ body {
 
 .start-content {
   position: absolute;
-  bottom: 5%;
+  top: 5%;
   right: 5%;
-  left: auto;
-  width: fit-content;
-  max-width: min(90vw, 400px);
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  backdrop-filter: none;
 }
 
 @media screen and (max-width: 768px) {
   .start-content {
-    right: auto;
-    left: 50%;
-    transform: translateX(-50%);
+    top: 20px;
+    right: 20px;
   }
 }
 
@@ -121,6 +121,7 @@ p {
   position: absolute;
   top: 0; left: 0; width: 100%; height: 100%;
   cursor: none;
+  touch-action: none;
 }
 
 #forest-bg {

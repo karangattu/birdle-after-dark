@@ -23,6 +23,43 @@ export function checkBirdFound(flashlightX, flashlightY, birdsInfo, radius) {
 }
 
 /**
+ * Finds the first unfound bird currently illuminated by the flashlight beam.
+ * @param {number} flashlightX - The x coordinate of the flashlight center.
+ * @param {number} flashlightY - The y coordinate of the flashlight center.
+ * @param {Array<{id: string, x: number, y: number}>} birdsInfo - Array of bird objects with their center coordinates.
+ * @param {number} radius - The radius of the flashlight beam.
+ * @param {Set<string>|string[]} foundBirdIds - Bird IDs that have already been identified.
+ * @returns {string|null} - The ID of the candidate bird, or null if none are in range.
+ */
+export function getBirdCandidateInBeam(
+  flashlightX,
+  flashlightY,
+  birdsInfo,
+  radius,
+  foundBirdIds = new Set(),
+) {
+  const foundBirdSet = foundBirdIds instanceof Set
+    ? foundBirdIds
+    : new Set(foundBirdIds);
+
+  for (const bird of birdsInfo) {
+    if (foundBirdSet.has(bird.id)) {
+      continue;
+    }
+
+    const deltaX = flashlightX - bird.x;
+    const deltaY = flashlightY - bird.y;
+    const distanceSquared = deltaX * deltaX + deltaY * deltaY;
+
+    if (distanceSquared <= radius * radius) {
+      return bird.id;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Determines the current state of the game.
  * @param {number} timeRemaining - Seconds left on the clock.
  * @param {number} foundBirdsCount - Number of birds found so far.

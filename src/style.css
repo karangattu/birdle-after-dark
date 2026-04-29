@@ -18,13 +18,17 @@ body {
   color: var(--text-color);
   overflow: hidden;
   user-select: none;
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .screen {
   display: none;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   position: relative;
+  overflow: hidden;
 }
 
 .screen.active {
@@ -42,21 +46,22 @@ body {
 
 .start-artwork {
   position: absolute;
-  top: max(16px, env(safe-area-inset-top));
-  right: max(16px, env(safe-area-inset-right));
-  bottom: max(16px, env(safe-area-inset-bottom));
-  left: max(16px, env(safe-area-inset-left));
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  bottom: max(10px, env(safe-area-inset-bottom));
+  left: max(10px, env(safe-area-inset-left));
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: clamp(4px, 1.5vmin, 18px);
 }
 
 #start-poster {
   display: block;
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
 }
 
 .start-content, .end-content {
@@ -128,6 +133,84 @@ p {
   object-fit: cover;
 }
 
+/* Tutorial Modal */
+.tutorial-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.82);
+  z-index: 60;
+  backdrop-filter: blur(8px);
+}
+
+.tutorial-content {
+  width: min(520px, 100%);
+  background: #151515;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 12px;
+  padding: clamp(22px, 4vw, 34px);
+  box-shadow: 0 24px 70px rgba(0,0,0,0.65);
+}
+
+.tutorial-kicker {
+  color: var(--primary-color);
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  margin-bottom: 8px;
+  opacity: 1;
+  text-transform: uppercase;
+}
+
+.tutorial-content h2 {
+  font-size: clamp(1.6rem, 4vw, 2.1rem);
+  margin-bottom: 20px;
+}
+
+.tutorial-steps {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 26px;
+}
+
+.tutorial-step {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.tutorial-step span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255,204,0,0.14);
+  border: 1px solid rgba(255,204,0,0.45);
+  color: var(--primary-color);
+  font-weight: 900;
+}
+
+.tutorial-step p {
+  margin: 5px 0 0;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+#tutorial-start-btn {
+  width: 100%;
+  border-radius: 12px;
+}
+
 /* Game Screen */
 #game-screen.active {
   display: block; /* override flex to allow absolute positioning */
@@ -165,6 +248,11 @@ p {
   filter: drop-shadow(0 0 10px #00ffcc) brightness(1.2);
   transform: scale(1.1);
   z-index: 7; /* Bring found birds above flashlight overlay */
+}
+
+.bird.sighted {
+  filter: drop-shadow(0 0 12px rgba(255, 204, 0, 0.95)) brightness(1.15);
+  transform: scale(1.06);
 }
 
 .bird.missed {
@@ -241,6 +329,73 @@ p {
   opacity: 1;
   color: #00ffcc;
   text-decoration: line-through;
+}
+
+#hud-bottom {
+  position: absolute;
+  right: 0;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  left: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 25;
+  padding: 0 16px;
+  pointer-events: none;
+}
+
+.sighting-panel {
+  width: min(440px, 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 12px 12px 16px;
+  background: rgba(10,10,10,0.78);
+  border: 1px solid rgba(255,204,0,0.36);
+  border-radius: 12px;
+  box-shadow: 0 18px 42px rgba(0,0,0,0.45);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.sighting-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.sighting-copy span {
+  color: var(--primary-color);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sighting-copy strong {
+  font-size: 1rem;
+}
+
+.identify-btn {
+  flex: 0 0 auto;
+  background: var(--primary-color);
+  border: 0;
+  color: #000;
+  padding: 12px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 900;
+  transition: transform 0.2s, filter 0.2s;
+}
+
+.identify-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.identify-btn:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 .hidden { display: none !important; }
@@ -346,4 +501,36 @@ p {
 
 #guess-feedback.hidden {
   display: none;
+}
+
+@media screen and (max-width: 640px) {
+  .primary-btn {
+    padding: 12px 28px;
+    font-size: 1rem;
+  }
+
+  #timer {
+    font-size: 2.2rem;
+  }
+
+  #checklist {
+    padding: 10px;
+  }
+
+  #checklist li {
+    font-size: 0.92rem;
+  }
+
+  .guess-content {
+    width: min(92vw, 460px);
+    padding: 24px;
+  }
+
+  .guess-options {
+    grid-template-columns: 1fr;
+  }
+
+  .sighting-panel {
+    align-items: stretch;
+  }
 }

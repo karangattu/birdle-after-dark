@@ -32,6 +32,29 @@
       <video id="transition-video" src="/assets/game_video.mp4" playsinline></video>
     </div>
 
+    <!-- Tutorial Modal -->
+    <div id="tutorial-modal" class="tutorial-modal hidden" role="dialog" aria-modal="true" aria-labelledby="tutorial-title">
+      <div class="tutorial-content">
+        <p class="tutorial-kicker">Field Briefing</p>
+        <h2 id="tutorial-title">Night Search Protocol</h2>
+        <div class="tutorial-steps">
+          <div class="tutorial-step">
+            <span>1</span>
+            <p>Move the beam until a bird is clearly inside the light.</p>
+          </div>
+          <div class="tutorial-step">
+            <span>2</span>
+            <p>Use the Identify button when the sighting panel appears.</p>
+          </div>
+          <div class="tutorial-step">
+            <span>3</span>
+            <p>Pick the species carefully. A wrong call costs 5 seconds.</p>
+          </div>
+        </div>
+        <button id="tutorial-start-btn" class="primary-btn" type="button">Start Hunt</button>
+      </div>
+    </div>
+
     <!-- Audio -->
     <audio id="bg-audio" loop preload="auto"></audio>
 
@@ -69,13 +92,19 @@
 
       <!-- HUD: Bottom -->
       <div id="hud-bottom" class="hidden">
-        <!-- Register button removed, clicking anywhere registers now -->
+        <div id="sighting-panel" class="sighting-panel hidden" aria-live="polite">
+          <div class="sighting-copy">
+            <span>Bird in beam</span>
+            <strong>Ready to identify</strong>
+          </div>
+          <button id="identify-btn" class="identify-btn" type="button" disabled>Identify</button>
+        </div>
       </div>
 
       <!-- Guessing Modal -->
-      <div id="guess-modal" class="hidden">
+      <div id="guess-modal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="guess-title">
         <div class="guess-content">
-          <h2>Which bird did you find?</h2>
+          <h2 id="guess-title">Which bird did you find?</h2>
           <div class="guess-options">
             <button class="guess-btn" data-bird="great_horned_owl">Great Horned Owl</button>
             <button class="guess-btn" data-bird="western_screech_owl">Western Screech Owl</button>

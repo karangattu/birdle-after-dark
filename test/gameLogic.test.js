@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   checkBirdFound,
   getEndGamePresentation,
+  getBirdCandidateInBeam,
   getFlashlightPositions,
   isGameOver,
   isTapInteraction,
@@ -28,6 +29,25 @@ describe('gameLogic', () => {
 
     it('should find the correct bird when multiple exist', () => {
       expect(checkBirdFound(310, 410, birds, 50)).toBe('bird2');
+    });
+  });
+
+  describe('getBirdCandidateInBeam', () => {
+    const birds = [
+      { id: 'bird1', x: 100, y: 100 },
+      { id: 'bird2', x: 300, y: 400 },
+    ];
+
+    it('should return an unfound bird inside the flashlight beam', () => {
+      expect(getBirdCandidateInBeam(100, 100, birds, 50, new Set())).toBe('bird1');
+    });
+
+    it('should ignore birds that have already been found', () => {
+      expect(getBirdCandidateInBeam(100, 100, birds, 50, new Set(['bird1']))).toBeNull();
+    });
+
+    it('should return null when no unfound bird is in the beam', () => {
+      expect(getBirdCandidateInBeam(200, 200, birds, 50, new Set())).toBeNull();
     });
   });
 

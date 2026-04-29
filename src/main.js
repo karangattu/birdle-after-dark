@@ -1,9 +1,8 @@
 import {
-  checkBirdFound,
+  getBirdCandidateInBeam,
   getEndGamePresentation,
   getFlashlightPositions,
   isGameOver,
-  isTapInteraction,
 } from './gameLogic.js';
 import bgAudioSrc from '../assets/great_horned_owl.mp3';
 
@@ -23,10 +22,15 @@ const endMessage = document.getElementById('end-message');
 const bgAudio = document.getElementById('bg-audio');
 const videoScreen = document.getElementById('video-screen');
 const transitionVideo = document.getElementById('transition-video');
+const tutorialModal = document.getElementById('tutorial-modal');
+const tutorialStartBtn = document.getElementById('tutorial-start-btn');
 
 const guessModal = document.getElementById('guess-modal');
 const guessBtns = document.querySelectorAll('.guess-btn');
 const guessFeedback = document.getElementById('guess-feedback');
+const hudBottom = document.getElementById('hud-bottom');
+const sightingPanel = document.getElementById('sighting-panel');
+const identifyBtn = document.getElementById('identify-btn');
 
 bgAudio.src = bgAudioSrc;
 
@@ -42,8 +46,8 @@ let currentMouseY = window.innerHeight / 2;
 let isPlaying = false;
 let isGuessing = false;
 let currentBirdTarget = null;
+let currentBirdCandidate = null;
 let activePointerId = null;
-let pointerDownPosition = null;
 let endGameTimeout = null;
 let currentControlMode = 'mouse';
 
@@ -86,6 +90,60 @@ function getHandRenderSize() {
   };
 }
 
+function getBirdsInfo() {
+  return birdIds.map(id => {
+    const el = document.getElementById(id);
+    const rect = el.getBoundingClientRect();
+
+    return {
+      id,
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+  });
+}
+
+function setBirdCandidate(birdId) {
+  currentBirdCandidate = birdId;
+
+  birdIds.forEach(id => {
+    document.getElementById(id).classList.toggle('sighted', id === birdId);
+  });
+
+  const hasCandidate = Boolean(birdId);
+  hudBottom.classList.toggle('hidden', !hasCandidate);
+  sightingPanel.classList.toggle('hidden', !hasCandidate);
+  identifyBtn.disabled = !hasCandidate;
+}
+
+function refreshBirdCandidate() {
+  if (!isPlaying || isGuessing) {
+    return;
+  }
+
+  const birdId = getBirdCandidateInBeam(
+    currentMouseX,
+    currentMouseY,
+    getBirdsInfo(),
+    FLASHLIGHT_RADIUS,
+    foundBirds,
+  );
+
+  setBirdCandidate(birdId);
+}
+
+function openGuessModal(birdId) {
+  if (!birdId || foundBirds.has(birdId)) {
+    return;
+  }
+
+  isGuessing = true;
+  currentBirdTarget = birdId;
+  setBirdCandidate(null);
+  guessModal.classList.remove('hidden');
+  guessFeedback.classList.add('hidden');
+}
+
 function updateFlashlight(x, y, controlMode = currentControlMode) {
   if (!isPlaying) return;
   currentControlMode = controlMode;
@@ -106,6 +164,8 @@ function updateFlashlight(x, y, controlMode = currentControlMode) {
   // Update hand position
   flashlightHand.style.left = `${positions.handX}px`;
   flashlightHand.style.top = `${positions.handY}px`;
+
+  refreshBirdCandidate();
 }
 
 function randomizeBirds() {
@@ -123,17 +183,23 @@ function startGame() {
   startScreen.classList.remove('active');
   endScreen.classList.remove('active');
   videoScreen.classList.add('active');
+  tutorialModal.classList.add('hidden');
 
   transitionVideo.currentTime = 0;
   transitionVideo.play().catch(err => {
-    console.log('Video play failed, skipping to game', err);
-    startGameLogic();
+    console.log('Video play failed, skipping to tutorial', err);
+    showTutorial();
   });
   
   transitionVideo.onended = () => {
-    videoScreen.classList.remove('active');
-    startGameLogic();
+    showTutorial();
   };
+}
+
+function showTutorial() {
+  videoScreen.classList.remove('active');
+  tutorialModal.classList.remove('hidden');
+  tutorialStartBtn.focus();
 }
 
 function startGameLogic() {
@@ -143,11 +209,13 @@ function startGameLogic() {
   isPlaying = true;
   isGuessing = false;
   currentBirdTarget = null;
+  currentBirdCandidate = null;
   activePointerId = null;
-  pointerDownPosition = null;
   currentControlMode = 'mouse';
+  tutorialModal.classList.add('hidden');
   guessModal.classList.add('hidden');
   guessFeedback.classList.add('hidden');
+  setBirdCandidate(null);
   
   // Reset UI
   timerEl.innerText = `1:00`;
@@ -156,6 +224,7 @@ function startGameLogic() {
     const el = document.getElementById(id);
     el.classList.remove('found');
     el.classList.remove('missed');
+    el.classList.remove('sighted');
     document.getElementById(`check-${id}`).classList.remove('found');
   });
 
@@ -203,10 +272,11 @@ function endGame(result) {
   isPlaying = false;
   isGuessing = false;
   currentBirdTarget = null;
+  currentBirdCandidate = null;
   activePointerId = null;
-  pointerDownPosition = null;
   clearInterval(gameInterval);
   gameInterval = null;
+  setBirdCandidate(null);
   guessModal.classList.add('hidden');
   guessFeedback.classList.add('hidden');
   
@@ -250,33 +320,9 @@ function gameLoop() {
 }
 
 function handleRegister() {
-  if (!isPlaying) return;
+  if (!isPlaying || isGuessing) return;
 
-  // Get current bird coordinates from DOM
-  const birdsInfo = birdIds.map(id => {
-    const el = document.getElementById(id);
-    const rect = el.getBoundingClientRect();
-    return {
-      id,
-      x: rect.left + rect.width / 2,
-      y: rect.top + rect.height / 2
-    };
-  });
-
-  const foundBirdId = checkBirdFound(currentMouseX, currentMouseY, birdsInfo, FLASHLIGHT_RADIUS);
-  
-  if (foundBirdId && !foundBirds.has(foundBirdId)) {
-    isGuessing = true;
-    currentBirdTarget = foundBirdId;
-    guessModal.classList.remove('hidden');
-    guessFeedback.classList.add('hidden');
-  }
-}
-
-function shouldIgnoreRegisterTarget(target) {
-  return target instanceof Element && Boolean(
-    target.closest('#guess-modal') || target.closest('#hud-top')
-  );
+  openGuessModal(currentBirdCandidate);
 }
 
 function releaseTrackedPointer(pointerId) {
@@ -288,7 +334,6 @@ function releaseTrackedPointer(pointerId) {
   }
 
   activePointerId = null;
-  pointerDownPosition = null;
 }
 
 function handlePointerDown(event) {
@@ -303,11 +348,6 @@ function handlePointerDown(event) {
     activePointerId = event.pointerId;
     gameContainer.setPointerCapture?.(event.pointerId);
   }
-
-  pointerDownPosition = {
-    x: event.clientX,
-    y: event.clientY,
-  };
 
   updateFlashlight(event.clientX, event.clientY, controlMode);
 }
@@ -347,19 +387,7 @@ function handlePointerUp(event) {
     event.pointerType === 'mouse' ? 'mouse' : 'touch'
   );
 
-  const shouldRegister = isPlaying &&
-    !isGuessing &&
-    isTapInteraction(pointerDownPosition, {
-      x: event.clientX,
-      y: event.clientY,
-    }) &&
-    !shouldIgnoreRegisterTarget(event.target);
-
   releaseTrackedPointer(event.pointerId);
-
-  if (shouldRegister) {
-    handleRegister();
-  }
 }
 
 function handlePointerCancel(event) {
@@ -387,6 +415,8 @@ guessBtns.forEach(btn => {
       // Check win condition immediately
       if (isGameOver(timeRemaining, foundBirds.size, TOTAL_BIRDS) === 'win') {
         endGame('win');
+      } else {
+        refreshBirdCandidate();
       }
     } else {
       // Incorrect guess
@@ -409,6 +439,8 @@ guessBtns.forEach(btn => {
 // Event Listeners
 startBtn.addEventListener('click', startGame);
 restartBtn.addEventListener('click', startGame);
+tutorialStartBtn.addEventListener('click', startGameLogic);
+identifyBtn.addEventListener('click', handleRegister);
 
 gameContainer.addEventListener('pointerdown', handlePointerDown);
 gameContainer.addEventListener('pointermove', handlePointerMove);

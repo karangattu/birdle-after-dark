@@ -12,6 +12,9 @@ const darknessOverlay = document.getElementById('darkness-overlay');
 const flashlightHand = document.getElementById('flashlight-hand');
 const endTitle = document.getElementById('end-title');
 const endMessage = document.getElementById('end-message');
+const bgAudio = document.getElementById('bg-audio');
+const videoScreen = document.getElementById('video-screen');
+const transitionVideo = document.getElementById('transition-video');
 
 const guessModal = document.getElementById('guess-modal');
 const guessBtns = document.querySelectorAll('.guess-btn');
@@ -58,6 +61,23 @@ function randomizeBirds() {
 }
 
 function startGame() {
+  startScreen.classList.remove('active');
+  endScreen.classList.remove('active');
+  videoScreen.classList.add('active');
+
+  transitionVideo.currentTime = 0;
+  transitionVideo.play().catch(err => {
+    console.log('Video play failed, skipping to game', err);
+    startGameLogic();
+  });
+  
+  transitionVideo.onended = () => {
+    videoScreen.classList.remove('active');
+    startGameLogic();
+  };
+}
+
+function startGameLogic() {
   timeRemaining = GAME_DURATION;
   foundBirds.clear();
   isPlaying = true;
@@ -87,11 +107,17 @@ function startGame() {
   // Start loop
   if (gameInterval) clearInterval(gameInterval);
   gameInterval = setInterval(gameLoop, 1000);
+
+  // Start background audio
+  bgAudio.currentTime = 0;
+  bgAudio.play().catch(err => console.log('Audio playback failed:', err));
 }
 
 function endGame(result) {
   isPlaying = false;
   clearInterval(gameInterval);
+  
+  bgAudio.pause();
   
   gameScreen.classList.remove('active');
   endScreen.classList.add('active');

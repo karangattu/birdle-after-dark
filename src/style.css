@@ -36,9 +36,11 @@ body {
 
 /* Start Screen */
 #start-screen {
+  background-color: #000;
   background-image: url('/assets/game_poster.png');
-  background-size: cover;
+  background-size: contain;
   background-position: center;
+  background-repeat: no-repeat;
 }
 
 .start-content, .end-content {
@@ -48,6 +50,13 @@ body {
   padding: 30px;
   border-radius: 16px;
   backdrop-filter: blur(10px);
+}
+
+.start-content {
+  position: absolute;
+  bottom: 5%;
+  width: 90%;
+  max-width: 400px;
 }
 
 h1 {
@@ -108,15 +117,25 @@ p {
   transition: filter 0.3s, transform 0.3s;
 }
 
-/* Initial coordinates - percentages help responsive but absolute px is better for gameplay */
-#great_horned_owl { top: 20%; left: 15%; width: 120px; }
-#western_screech_owl { top: 60%; left: 80%; width: 90px; }
-#barn_owl { top: 30%; left: 55%; width: 110px; }
-#common_poorwill { top: 80%; left: 30%; width: 80px; }
+/* Initial widths - coordinates set via JS */
+#great_horned_owl { width: 120px; }
+#western_screech_owl { width: 90px; }
+#barn_owl { width: 110px; }
+#common_poorwill { width: 80px; }
 
 .bird.found {
   filter: drop-shadow(0 0 10px #00ffcc) brightness(1.2);
   transform: scale(1.1);
+  z-index: 7; /* Bring found birds above flashlight overlay */
+}
+
+.bird.missed {
+  filter: drop-shadow(0 0 15px #ff3333) brightness(1.5);
+  transform: scale(1.2);
+  border: 2px dashed #ff3333;
+  border-radius: 10px;
+  padding: 5px;
+  z-index: 7;
 }
 
 #darkness-overlay {

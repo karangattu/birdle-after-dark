@@ -46,6 +46,17 @@ function updateFlashlight(x, y) {
   flashlightHand.style.top = `${y}px`;
 }
 
+function randomizeBirds() {
+  birdIds.forEach(id => {
+    const el = document.getElementById(id);
+    // Randomize between 10% and 85% for top and left to keep them on screen
+    const randomTop = Math.floor(Math.random() * 75) + 10;
+    const randomLeft = Math.floor(Math.random() * 75) + 10;
+    el.style.top = `${randomTop}%`;
+    el.style.left = `${randomLeft}%`;
+  });
+}
+
 function startGame() {
   timeRemaining = GAME_DURATION;
   foundBirds.clear();
@@ -59,9 +70,14 @@ function startGame() {
   timerEl.innerText = `1:00`;
   birdsFoundCountEl.innerText = '0';
   birdIds.forEach(id => {
-    document.getElementById(id).classList.remove('found');
+    const el = document.getElementById(id);
+    el.classList.remove('found');
+    el.classList.remove('missed');
     document.getElementById(`check-${id}`).classList.remove('found');
   });
+
+  randomizeBirds();
+  updateFlashlight(window.innerWidth / 2, window.innerHeight / 2);
 
   // Switch screens
   startScreen.classList.remove('active');
@@ -89,7 +105,15 @@ function endGame(result) {
     if (navigator.vibrate) navigator.vibrate([300]); // Long buzz for loss
     endTitle.innerText = "Game Over";
     endTitle.style.color = "#ff3333";
-    endMessage.innerText = "You ran out of time. The birds remain hidden.";
+    endMessage.innerText = "You ran out of time. The birds you missed are highlighted.";
+    
+    // Reveal missed birds
+    darknessOverlay.style.background = 'transparent';
+    birdIds.forEach(id => {
+      if (!foundBirds.has(id)) {
+        document.getElementById(id).classList.add('missed');
+      }
+    });
   }
 }
 

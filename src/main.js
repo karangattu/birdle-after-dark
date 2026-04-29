@@ -6,7 +6,6 @@ const gameScreen = document.getElementById('game-screen');
 const endScreen = document.getElementById('end-screen');
 const startBtn = document.getElementById('start-btn');
 const restartBtn = document.getElementById('restart-btn');
-const registerBtn = document.getElementById('register-btn');
 const timerEl = document.getElementById('timer');
 const birdsFoundCountEl = document.getElementById('birds-found-count');
 const darknessOverlay = document.getElementById('darkness-overlay');
@@ -174,8 +173,8 @@ guessBtns.forEach(btn => {
 startBtn.addEventListener('click', startGame);
 restartBtn.addEventListener('click', startGame);
 
-registerBtn.addEventListener('click', (e) => {
-  e.stopPropagation(); // Prevent issues if click bubbles to container
+gameScreen.addEventListener('click', (e) => {
+  if (e.target.closest('#guess-modal') || e.target.closest('#hud-top')) return;
   handleRegister();
 });
 

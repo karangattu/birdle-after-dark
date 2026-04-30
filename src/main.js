@@ -7,6 +7,7 @@ import {
   getFlashlightPositions,
   getStreakFeedback,
   isGameOver,
+  getRandomBirdPosition,
 } from './gameLogic.js';
 import barnOwlAudioSrc from '../assets/barn_owl.mp3';
 import commonPoorwillAudioSrc from '../assets/common_poorwill.mp3';
@@ -478,11 +479,10 @@ function updateFlashlight(x, y, controlMode = currentControlMode) {
 function randomizeBirds() {
   birdIds.forEach(id => {
     const el = document.getElementById(id);
-    // Randomize between 10% and 85% for top and left to keep them on screen
-    const randomTop = Math.floor(Math.random() * 75) + 10;
-    const randomLeft = Math.floor(Math.random() * 75) + 10;
-    el.style.top = `${randomTop}%`;
-    el.style.left = `${randomLeft}%`;
+    const pos = getRandomBirdPosition();
+
+    el.style.top = `${pos.top}%`;
+    el.style.left = `${pos.left}%`;
   });
 }
 

@@ -247,3 +247,27 @@ export function getFlashlightPositions(
     handY: controlY + handHeight * (50 / 164),
   };
 }
+
+/**
+ * Generates a random coordinate for a bird, avoiding the top-right checklist UI area.
+ * @returns {{top: number, left: number}}
+ */
+export function getRandomBirdPosition() {
+  let randomTop, randomLeft;
+  let isValidPosition = false;
+
+  while (!isValidPosition) {
+    // Randomize between 10% and 85% for top and left to keep them on screen
+    randomTop = Math.floor(Math.random() * 75) + 10;
+    randomLeft = Math.floor(Math.random() * 75) + 10;
+
+    // Avoid top-right corner where the "Birds Found" checklist is located
+    const isInChecklistZone = randomTop < 45 && randomLeft > 55;
+    
+    if (!isInChecklistZone) {
+      isValidPosition = true;
+    }
+  }
+
+  return { top: randomTop, left: randomLeft };
+}

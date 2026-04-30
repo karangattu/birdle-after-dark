@@ -9,6 +9,7 @@ import {
   getStreakFeedback,
   isGameOver,
   isTapInteraction,
+  getRandomBirdPosition,
 } from '../src/gameLogic';
 
 describe('gameLogic', () => {
@@ -203,6 +204,22 @@ describe('gameLogic', () => {
         handX: 15,
         handY: 175,
       });
+    });
+  });
+
+  describe('getRandomBirdPosition', () => {
+    it('should generate valid coordinates avoiding the top-right corner', () => {
+      for (let i = 0; i < 100; i++) {
+        const pos = getRandomBirdPosition();
+        
+        expect(pos.top).toBeGreaterThanOrEqual(10);
+        expect(pos.top).toBeLessThanOrEqual(85);
+        expect(pos.left).toBeGreaterThanOrEqual(10);
+        expect(pos.left).toBeLessThanOrEqual(85);
+
+        const isInChecklistZone = pos.top < 45 && pos.left > 55;
+        expect(isInChecklistZone).toBe(false);
+      }
     });
   });
 });

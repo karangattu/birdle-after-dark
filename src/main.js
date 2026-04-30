@@ -1,10 +1,17 @@
+import { registerSW } from 'virtual:pwa-register';
 import {
+  calculateIdentificationScore,
   getBirdCandidateInBeam,
+  getDirectionalBirdCallMix,
   getEndGamePresentation,
   getFlashlightPositions,
+  getStreakFeedback,
   isGameOver,
 } from './gameLogic.js';
-import bgAudioSrc from '../assets/great_horned_owl.mp3';
+import barnOwlAudioSrc from '../assets/barn_owl.mp3';
+import commonPoorwillAudioSrc from '../assets/common_poorwill.mp3';
+import greatHornedOwlAudioSrc from '../assets/great_horned_owl.mp3';
+import westernScreechOwlAudioSrc from '../assets/western_screech_owl.mp3';
 
 // DOM Elements
 const startScreen = document.getElementById('start-screen');
@@ -14,12 +21,14 @@ const gameContainer = document.getElementById('game-container');
 const startBtn = document.getElementById('start-btn');
 const restartBtn = document.getElementById('restart-btn');
 const timerEl = document.getElementById('timer');
+const scoreCountEl = document.getElementById('score-count');
+const highScoreCountEl = document.getElementById('high-score-count');
 const birdsFoundCountEl = document.getElementById('birds-found-count');
 const darknessOverlay = document.getElementById('darkness-overlay');
 const flashlightHand = document.getElementById('flashlight-hand');
 const endTitle = document.getElementById('end-title');
 const endMessage = document.getElementById('end-message');
-const bgAudio = document.getElementById('bg-audio');
+const endScoreSummary = document.getElementById('end-score-summary');
 const videoScreen = document.getElementById('video-screen');
 const transitionVideo = document.getElementById('transition-video');
 const tutorialModal = document.getElementById('tutorial-modal');
@@ -31,15 +40,21 @@ const guessFeedback = document.getElementById('guess-feedback');
 const hudBottom = document.getElementById('hud-bottom');
 const sightingPanel = document.getElementById('sighting-panel');
 const identifyBtn = document.getElementById('identify-btn');
-
-bgAudio.src = bgAudioSrc;
+const streakFeedback = document.getElementById('streak-feedback');
+const streakFeedbackLabel = document.getElementById('streak-feedback-label');
+const streakFeedbackPoints = document.getElementById('streak-feedback-points');
 
 const GAME_DURATION = 60;
 const FLASHLIGHT_RADIUS = 40;
 const TOTAL_BIRDS = 4;
+const HIGH_SCORE_STORAGE_KEY = 'birdle-after-dark-high-score';
+const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
 
 let timeRemaining = GAME_DURATION;
 let foundBirds = new Set();
+let score = 0;
+let highScore = readStoredHighScore();
+let correctStreak = 0;
 let gameInterval = null;
 let currentMouseX = window.innerWidth / 2;
 let currentMouseY = window.innerHeight / 2;
@@ -49,15 +64,151 @@ let currentBirdTarget = null;
 let currentBirdCandidate = null;
 let activePointerId = null;
 let endGameTimeout = null;
+let streakFeedbackTimeout = null;
 let currentControlMode = 'mouse';
+let audioContext = null;
 
 // Initialize birds info
 const birdIds = ['great_horned_owl', 'western_screech_owl', 'barn_owl', 'common_poorwill'];
+const birdCallSources = {
+  great_horned_owl: greatHornedOwlAudioSrc,
+  western_screech_owl: westernScreechOwlAudioSrc,
+  barn_owl: barnOwlAudioSrc,
+  common_poorwill: commonPoorwillAudioSrc,
+};
+const birdCallNodes = new Map();
+
+function registerAppServiceWorker() {
+  if (!('serviceWorker' in navigator) || !import.meta.env.PROD) {
+    return;
+  }
+
+  registerSW({
+    immediate: true,
+    onRegisteredSW(_swUrl, registration) {
+      if (!registration) {
+        return;
+      }
+
+      const update = () => {
+        if (navigator.onLine) {
+          registration.update();
+        }
+      };
+
+      update();
+      window.setInterval(update, UPDATE_CHECK_INTERVAL_MS);
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          update();
+        }
+      });
+    },
+    onRegisterError(error) {
+      console.log('Service worker registration failed:', error);
+    },
+  });
+}
 
 function clearPendingEndGame() {
   if (endGameTimeout) {
     window.clearTimeout(endGameTimeout);
     endGameTimeout = null;
+  }
+}
+
+function readStoredHighScore() {
+  try {
+    const storedValue = window.localStorage.getItem(HIGH_SCORE_STORAGE_KEY);
+    const parsedValue = Number.parseInt(storedValue, 10);
+
+    return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function storeHighScore(value) {
+  try {
+    window.localStorage.setItem(HIGH_SCORE_STORAGE_KEY, String(value));
+  } catch {
+    // Ignore storage failures so private browsing modes remain playable.
+  }
+}
+
+function formatScore(value) {
+  return value.toLocaleString('en-US');
+}
+
+function updateScoreboard() {
+  scoreCountEl.innerText = formatScore(score);
+  highScoreCountEl.innerText = formatScore(highScore);
+}
+
+function clearStreakFeedback() {
+  if (streakFeedbackTimeout) {
+    window.clearTimeout(streakFeedbackTimeout);
+    streakFeedbackTimeout = null;
+  }
+
+  streakFeedback.classList.add('hidden');
+}
+
+function showStreakFeedback(label, pointsEarned) {
+  if (!label) {
+    return;
+  }
+
+  clearStreakFeedback();
+  streakFeedbackLabel.innerText = label;
+  streakFeedbackPoints.innerText = `+${formatScore(pointsEarned)} points`;
+  streakFeedback.classList.remove('hidden');
+
+  streakFeedbackTimeout = window.setTimeout(() => {
+    streakFeedbackTimeout = null;
+    streakFeedback.classList.add('hidden');
+  }, 1300);
+}
+
+function updateHighScore() {
+  if (score <= highScore) {
+    return false;
+  }
+
+  highScore = score;
+  storeHighScore(highScore);
+  updateScoreboard();
+
+  return true;
+}
+
+function renderEndScoreSummary(isNewHighScore) {
+  endScoreSummary.innerHTML = '';
+
+  const rows = [
+    ['Score', formatScore(score)],
+    ['Best', formatScore(highScore)],
+  ];
+
+  rows.forEach(([label, value]) => {
+    const scoreRow = document.createElement('div');
+    scoreRow.className = 'end-score-row';
+
+    const labelEl = document.createElement('span');
+    labelEl.innerText = label;
+
+    const valueEl = document.createElement('strong');
+    valueEl.innerText = value;
+
+    scoreRow.append(labelEl, valueEl);
+    endScoreSummary.append(scoreRow);
+  });
+
+  if (isNewHighScore) {
+    const newBestEl = document.createElement('div');
+    newBestEl.className = 'new-best';
+    newBestEl.innerText = 'New personal best';
+    endScoreSummary.append(newBestEl);
   }
 }
 
@@ -103,6 +254,160 @@ function getBirdsInfo() {
   });
 }
 
+function getAudioContext() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+
+  if (!AudioContextClass) {
+    return null;
+  }
+
+  if (!audioContext) {
+    audioContext = new AudioContextClass();
+  }
+
+  return audioContext;
+}
+
+function getBirdCallHintDistance() {
+  const rect = gameContainer.getBoundingClientRect();
+  const largestAxis = Math.max(
+    rect.width || window.innerWidth,
+    rect.height || window.innerHeight,
+  );
+
+  return Math.max(260, Math.min(560, largestAxis * 0.44));
+}
+
+function initializeBirdCallAudio() {
+  if (birdCallNodes.size > 0) {
+    return getAudioContext();
+  }
+
+  const context = getAudioContext();
+
+  if (!context) {
+    return null;
+  }
+
+  birdIds.forEach(id => {
+    const audio = new Audio(birdCallSources[id]);
+    audio.loop = true;
+    audio.preload = 'auto';
+
+    const source = context.createMediaElementSource(audio);
+    const filter = context.createBiquadFilter();
+    const gain = context.createGain();
+    const panner = typeof context.createStereoPanner === 'function'
+      ? context.createStereoPanner()
+      : null;
+
+    filter.type = 'lowpass';
+    filter.frequency.value = 700;
+    filter.Q.value = 0.5;
+    gain.gain.value = 0;
+
+    source.connect(filter);
+    filter.connect(gain);
+
+    if (panner) {
+      panner.pan.value = 0;
+      gain.connect(panner);
+      panner.connect(context.destination);
+    } else {
+      gain.connect(context.destination);
+    }
+
+    birdCallNodes.set(id, {
+      audio,
+      filter,
+      gain,
+      panner,
+    });
+  });
+
+  return context;
+}
+
+function updateBirdCallAudio() {
+  if (!audioContext || birdCallNodes.size === 0) {
+    return;
+  }
+
+  const hintDistance = getBirdCallHintDistance();
+  const mixes = isPlaying && !isGuessing
+    ? getDirectionalBirdCallMix(
+      currentMouseX,
+      currentMouseY,
+      getBirdsInfo(),
+      foundBirds,
+      {
+        maxDistance: hintDistance,
+        maxVolume: 0.24,
+        maxPan: 0.62,
+        panDistance: hintDistance * 0.78,
+      },
+    )
+    : birdIds.map(id => ({ id, volume: 0, pan: 0, clarity: 0 }));
+  const mixById = new Map(mixes.map(mix => [mix.id, mix]));
+  const now = audioContext.currentTime;
+
+  birdCallNodes.forEach(({ filter, gain, panner }, id) => {
+    const mix = mixById.get(id) ?? { volume: 0, pan: 0, clarity: 0 };
+    const clarityFrequency = 700 + mix.clarity * 5600;
+
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setTargetAtTime(mix.volume, now, 0.16);
+    filter.frequency.cancelScheduledValues(now);
+    filter.frequency.setTargetAtTime(clarityFrequency, now, 0.18);
+
+    if (panner) {
+      panner.pan.cancelScheduledValues(now);
+      panner.pan.setTargetAtTime(mix.pan, now, 0.16);
+    }
+  });
+}
+
+function startBirdCalls() {
+  const context = initializeBirdCallAudio();
+
+  if (!context) {
+    return;
+  }
+
+  const resumePromise = context.resume?.();
+
+  if (resumePromise) {
+    resumePromise.catch(err => {
+      console.log('Audio context resume failed:', err);
+    });
+  }
+
+  birdCallNodes.forEach(({ audio }) => {
+    try {
+      audio.currentTime = 0;
+    } catch {
+      // Some browsers defer seeking until metadata is available.
+    }
+
+    const playPromise = audio.play();
+
+    if (playPromise) {
+      playPromise.catch(err => {
+        console.log('Bird call playback failed:', err);
+      });
+    }
+  });
+
+  updateBirdCallAudio();
+}
+
+function pauseBirdCalls() {
+  birdCallNodes.forEach(({ audio, gain }) => {
+    gain.gain.value = 0;
+    audio.pause();
+  });
+}
+
 function setBirdCandidate(birdId) {
   currentBirdCandidate = birdId;
 
@@ -142,6 +447,7 @@ function openGuessModal(birdId) {
   setBirdCandidate(null);
   guessModal.classList.remove('hidden');
   guessFeedback.classList.add('hidden');
+  updateBirdCallAudio();
 }
 
 function updateFlashlight(x, y, controlMode = currentControlMode) {
@@ -166,6 +472,7 @@ function updateFlashlight(x, y, controlMode = currentControlMode) {
   flashlightHand.style.top = `${positions.handY}px`;
 
   refreshBirdCandidate();
+  updateBirdCallAudio();
 }
 
 function randomizeBirds() {
@@ -206,6 +513,8 @@ function startGameLogic() {
   clearPendingEndGame();
   timeRemaining = GAME_DURATION;
   foundBirds.clear();
+  score = 0;
+  correctStreak = 0;
   isPlaying = true;
   isGuessing = false;
   currentBirdTarget = null;
@@ -215,10 +524,12 @@ function startGameLogic() {
   tutorialModal.classList.add('hidden');
   guessModal.classList.add('hidden');
   guessFeedback.classList.add('hidden');
+  clearStreakFeedback();
   setBirdCandidate(null);
   
   // Reset UI
   timerEl.innerText = `1:00`;
+  updateScoreboard();
   birdsFoundCountEl.innerText = '0';
   birdIds.forEach(id => {
     const el = document.getElementById(id);
@@ -243,9 +554,7 @@ function startGameLogic() {
   if (gameInterval) clearInterval(gameInterval);
   gameInterval = setInterval(gameLoop, 1000);
 
-  // Start background audio
-  bgAudio.currentTime = 0;
-  bgAudio.play().catch(err => console.log('Audio playback failed:', err));
+  startBirdCalls();
 }
 
 function showEndScreen(presentation) {
@@ -273,14 +582,18 @@ function endGame(result) {
   isGuessing = false;
   currentBirdTarget = null;
   currentBirdCandidate = null;
+  correctStreak = 0;
   activePointerId = null;
   clearInterval(gameInterval);
   gameInterval = null;
   setBirdCandidate(null);
+  clearStreakFeedback();
   guessModal.classList.add('hidden');
   guessFeedback.classList.add('hidden');
   
-  bgAudio.pause();
+  pauseBirdCalls();
+  const isNewHighScore = updateHighScore();
+  renderEndScoreSummary(isNewHighScore);
   const presentation = getEndGamePresentation(result, timeRemaining);
 
   if (result === 'win') {
@@ -406,11 +719,17 @@ guessBtns.forEach(btn => {
       currentBirdTarget = null;
       guessModal.classList.add('hidden');
       foundBirds.add(foundBirdId);
+      correctStreak += 1;
+      const pointsEarned = calculateIdentificationScore(timeRemaining, correctStreak);
+      score += pointsEarned;
+      updateScoreboard();
+      showStreakFeedback(getStreakFeedback(correctStreak), pointsEarned);
       
       // Update UI
       document.getElementById(foundBirdId).classList.add('found');
       document.getElementById(`check-${foundBirdId}`).classList.add('found');
       birdsFoundCountEl.innerText = foundBirds.size;
+      updateBirdCallAudio();
       
       // Check win condition immediately
       if (isGameOver(timeRemaining, foundBirds.size, TOTAL_BIRDS) === 'win') {
@@ -422,6 +741,7 @@ guessBtns.forEach(btn => {
       // Incorrect guess
       if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100]); // Warning buzz
       guessFeedback.classList.remove('hidden');
+      correctStreak = 0;
       timeRemaining -= 5;
       
       if (timeRemaining <= 0) {
@@ -448,4 +768,6 @@ gameContainer.addEventListener('pointerup', handlePointerUp);
 gameContainer.addEventListener('pointercancel', handlePointerCancel);
 
 // Initial update
+registerAppServiceWorker();
+updateScoreboard();
 updateFlashlight(window.innerWidth / 2, window.innerHeight / 2);

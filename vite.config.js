@@ -9,11 +9,19 @@ export default defineConfig({
       devOptions: {
         enabled: true
       },
-      includeAssets: ['assets/*.jpg', 'assets/*.png', 'assets/*.svg'],
+      workbox: {
+        cleanupOutdatedCaches: true,
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,mp3,mp4,webmanifest}'],
+        maximumFileSizeToCacheInBytes: 16 * 1024 * 1024,
+        navigateFallback: 'index.html'
+      },
       manifest: {
         name: 'Birdle After Dark',
         short_name: 'Birdle Dark',
         description: 'Find nocturnal birds in the dark forest before time runs out!',
+        id: '/birdle-after-dark/',
+        start_url: '/birdle-after-dark/',
+        scope: '/birdle-after-dark/',
         theme_color: '#0a0a0a',
         background_color: '#0a0a0a',
         display: 'standalone',

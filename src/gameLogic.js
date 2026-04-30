@@ -77,6 +77,95 @@ export function isGameOver(timeRemaining, foundBirdsCount, totalBirds) {
 }
 
 /**
+ * Calculates points for a correct identification.
+ * @param {number} timeRemaining - Seconds left on the clock.
+ * @param {number} streakCount - Number of correct identifications in a row.
+ * @returns {number}
+ */
+export function calculateIdentificationScore(timeRemaining, streakCount) {
+  const baseScore = 100;
+  const timeBonus = Math.max(0, timeRemaining) * 5;
+  const streakBonus = Math.max(0, streakCount - 1) * 50;
+
+  return baseScore + timeBonus + streakBonus;
+}
+
+/**
+ * Gets the encouragement label for a correct identification streak.
+ * @param {number} streakCount - Number of correct identifications in a row.
+ * @returns {string|null}
+ */
+export function getStreakFeedback(streakCount) {
+  if (streakCount <= 0) {
+    return null;
+  }
+
+  if (streakCount === 1) {
+    return 'Sharp eye';
+  }
+
+  if (streakCount === 2) {
+    return 'Night expert';
+  }
+
+  return 'Perfect streak';
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * Calculates directional audio mix values for hidden bird calls.
+ * @param {number} spotlightX - The x coordinate of the flashlight center.
+ * @param {number} spotlightY - The y coordinate of the flashlight center.
+ * @param {Array<{id: string, x: number, y: number}>} birdsInfo - Array of bird objects with their center coordinates.
+ * @param {Set<string>|string[]} foundBirdIds - Bird IDs that have already been identified.
+ * @param {{maxDistance?: number, maxVolume?: number, maxPan?: number, panDistance?: number}} options - Tuning values for the audio hint.
+ * @returns {Array<{id: string, volume: number, pan: number, clarity: number}>}
+ */
+export function getDirectionalBirdCallMix(
+  spotlightX,
+  spotlightY,
+  birdsInfo,
+  foundBirdIds = new Set(),
+  options = {},
+) {
+  const foundBirdSet = foundBirdIds instanceof Set
+    ? foundBirdIds
+    : new Set(foundBirdIds);
+  const maxDistance = Math.max(1, options.maxDistance ?? 420);
+  const maxVolume = Math.max(0, options.maxVolume ?? 0.22);
+  const maxPan = clamp(options.maxPan ?? 0.58, 0, 1);
+  const panDistance = Math.max(1, options.panDistance ?? maxDistance);
+
+  return birdsInfo.map(bird => {
+    if (foundBirdSet.has(bird.id)) {
+      return {
+        id: bird.id,
+        volume: 0,
+        pan: 0,
+        clarity: 0,
+      };
+    }
+
+    const deltaX = bird.x - spotlightX;
+    const deltaY = bird.y - spotlightY;
+    const distance = Math.hypot(deltaX, deltaY);
+    const clarity = clamp(1 - distance / maxDistance, 0, 1);
+    const volume = maxVolume * clarity * clarity;
+    const pan = clamp(deltaX / panDistance, -1, 1) * maxPan;
+
+    return {
+      id: bird.id,
+      volume,
+      pan,
+      clarity,
+    };
+  });
+}
+
+/**
  * Gets the content and timing for the end-game presentation.
  * @param {'win'|'loss'} result - Final game result.
  * @param {number} timeRemaining - Seconds left on the clock.

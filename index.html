@@ -55,9 +55,6 @@
       </div>
     </div>
 
-    <!-- Audio -->
-    <audio id="bg-audio" loop preload="auto"></audio>
-
     <!-- Game Screen -->
     <div id="game-screen" class="screen">
       <div id="game-container">
@@ -78,7 +75,13 @@
 
       <!-- HUD: Top -->
       <div id="hud-top">
-        <div id="timer">1:00</div>
+        <div id="hud-stats">
+          <div id="timer">1:00</div>
+          <div class="score-row">
+            <span>Score <strong id="score-count">0</strong></span>
+            <span>Best <strong id="high-score-count">0</strong></span>
+          </div>
+        </div>
         <div id="checklist">
           <h3>Birds Found (<span id="birds-found-count">0</span>/4)</h3>
           <ul>
@@ -114,6 +117,11 @@
           <p id="guess-feedback" class="hidden">Incorrect! -5 Seconds Penalty.</p>
         </div>
       </div>
+
+      <div id="streak-feedback" class="streak-feedback hidden" aria-live="polite">
+        <strong id="streak-feedback-label"></strong>
+        <span id="streak-feedback-points"></span>
+      </div>
     </div>
 
     <!-- End Screen -->
@@ -121,6 +129,7 @@
       <div class="end-content">
         <h1 id="end-title">Game Over</h1>
         <p id="end-message">You ran out of time.</p>
+        <div id="end-score-summary" class="end-score-summary"></div>
         <button id="restart-btn" class="primary-btn">Play Again</button>
       </div>
     </div>

@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
+  calculateIdentificationScore,
   checkBirdFound,
+  getDirectionalBirdCallMix,
   getEndGamePresentation,
   getBirdCandidateInBeam,
   getFlashlightPositions,
+  getStreakFeedback,
   isGameOver,
   isTapInteraction,
 } from '../src/gameLogic';
@@ -64,6 +67,86 @@ describe('gameLogic', () => {
     it('should return loss if time is out and not all birds found', () => {
       expect(isGameOver(0, 3, 4)).toBe('loss');
       expect(isGameOver(-1, 0, 4)).toBe('loss');
+    });
+  });
+
+  describe('calculateIdentificationScore', () => {
+    it('should award more points when a bird is identified faster', () => {
+      expect(calculateIdentificationScore(50, 1)).toBeGreaterThan(
+        calculateIdentificationScore(20, 1)
+      );
+    });
+
+    it('should add a bonus for an active correct streak', () => {
+      expect(calculateIdentificationScore(40, 3)).toBe(
+        calculateIdentificationScore(40, 1) + 100
+      );
+    });
+
+    it('should not return negative points when time has run out', () => {
+      expect(calculateIdentificationScore(-5, 1)).toBe(100);
+    });
+  });
+
+  describe('getStreakFeedback', () => {
+    it('should escalate feedback as the correct streak grows', () => {
+      expect(getStreakFeedback(1)).toBe('Sharp eye');
+      expect(getStreakFeedback(2)).toBe('Night expert');
+      expect(getStreakFeedback(3)).toBe('Perfect streak');
+      expect(getStreakFeedback(4)).toBe('Perfect streak');
+    });
+
+    it('should return null when there is no correct streak', () => {
+      expect(getStreakFeedback(0)).toBeNull();
+    });
+  });
+
+  describe('getDirectionalBirdCallMix', () => {
+    const birds = [
+      { id: 'left_bird', x: 80, y: 100 },
+      { id: 'right_bird', x: 220, y: 100 },
+      { id: 'far_bird', x: 600, y: 100 },
+    ];
+
+    it('should make nearby birds louder and clearer than distant birds', () => {
+      const [nearBird, fartherBird] = getDirectionalBirdCallMix(
+        100,
+        100,
+        birds.slice(0, 2),
+        new Set(),
+        { maxDistance: 160, maxVolume: 0.24 }
+      );
+
+      expect(nearBird.volume).toBeGreaterThan(fartherBird.volume);
+      expect(nearBird.clarity).toBeGreaterThan(fartherBird.clarity);
+    });
+
+    it('should pan birds left or right relative to the flashlight beam', () => {
+      const [leftBird, rightBird] = getDirectionalBirdCallMix(
+        150,
+        100,
+        birds.slice(0, 2),
+        new Set(),
+        { maxDistance: 160, panDistance: 100, maxPan: 0.6 }
+      );
+
+      expect(leftBird.pan).toBeLessThan(0);
+      expect(rightBird.pan).toBeGreaterThan(0);
+    });
+
+    it('should mute birds that are already found or outside the hint range', () => {
+      const [foundBird, , farBird] = getDirectionalBirdCallMix(
+        100,
+        100,
+        birds,
+        new Set(['left_bird']),
+        { maxDistance: 160, maxVolume: 0.24 }
+      );
+
+      expect(foundBird.volume).toBe(0);
+      expect(foundBird.clarity).toBe(0);
+      expect(farBird.volume).toBe(0);
+      expect(farBird.clarity).toBe(0);
     });
   });
 

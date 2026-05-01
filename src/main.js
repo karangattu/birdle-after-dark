@@ -36,6 +36,9 @@ const videoScreen = document.getElementById('video-screen');
 const transitionVideo = document.getElementById('transition-video');
 const tutorialModal = document.getElementById('tutorial-modal');
 const tutorialStartBtn = document.getElementById('tutorial-start-btn');
+const audioTip = document.getElementById('audio-tip');
+const audioTipButton = document.getElementById('audio-tip-button');
+const audioTipText = document.getElementById('audio-tip-text');
 
 const guessModal = document.getElementById('guess-modal');
 const guessBtns = document.querySelectorAll('.guess-btn');
@@ -58,7 +61,14 @@ const PORTABLE_FULLSCREEN_QUERY = '(pointer: coarse), (any-pointer: coarse)';
 const BIRD_PLACEMENT_PADDING = 18;
 const BIRD_PLACEMENT_ATTEMPTS = 180;
 const BOTTOM_HUD_RESERVED_HEIGHT = 92;
-const OPENING_AUDIO_VOLUME = 0.34;
+const OPENING_AUDIO_VOLUME = 0.42;
+const BIRD_CALL_MAX_VOLUME = 0.3;
+const BIRD_AUDIO_ELEMENT_VOLUME = 1;
+const LOW_MEDIA_VOLUME_THRESHOLD = 0.32;
+const AUDIO_TIP_HIDE_DELAY_MS = 6500;
+const AUDIO_TIP_REMINDER_MESSAGE = 'Turn up sound for the best bird-call clues.';
+const AUDIO_TIP_BOOSTED_MESSAGE = 'Game audio is back up. Check your device volume too.';
+const AUDIO_TIP_BLOCKED_MESSAGE = 'Tap the speaker to retry audio, then check device volume.';
 const BIRD_DOM_FALLBACK_POSITIONS = [
   { top: 38, left: 0 },
   { top: 38, left: 30 },
@@ -88,6 +98,8 @@ let streakFeedbackTimeout = null;
 let currentControlMode = 'mouse';
 let audioContext = null;
 let openingAudio = null;
+let audioTipTimeout = null;
+let isAudioContextWatched = false;
 
 // Initialize birds info
 const birdIds = ['great_horned_owl', 'western_screech_owl', 'barn_owl', 'common_poorwill'];
@@ -313,9 +325,169 @@ function getAudioContext() {
 
   if (!audioContext) {
     audioContext = new AudioContextClass();
+    watchAudioContextState(audioContext);
   }
 
   return audioContext;
+}
+
+function clearAudioTipTimeout() {
+  if (audioTipTimeout) {
+    window.clearTimeout(audioTipTimeout);
+    audioTipTimeout = null;
+  }
+}
+
+function setAudioTipMessage(message) {
+  if (!audioTipButton || !audioTipText) {
+    return;
+  }
+
+  audioTipText.innerText = message;
+  audioTipButton.setAttribute('aria-label', message);
+  audioTipButton.title = message;
+}
+
+function showAudioTip(message = AUDIO_TIP_REMINDER_MESSAGE, { persist = false } = {}) {
+  if (!audioTip) {
+    return;
+  }
+
+  clearAudioTipTimeout();
+  setAudioTipMessage(message);
+  audioTip.dataset.persist = persist ? 'true' : 'false';
+  audioTip.classList.remove('hidden');
+  audioTip.classList.add('is-open');
+
+  audioTipTimeout = window.setTimeout(() => {
+    audioTipTimeout = null;
+    audioTip.classList.remove('is-open');
+
+    if (!persist) {
+      audioTip.classList.add('hidden');
+    }
+  }, AUDIO_TIP_HIDE_DELAY_MS);
+}
+
+function hideAudioTip() {
+  if (!audioTip) {
+    return;
+  }
+
+  clearAudioTipTimeout();
+  audioTip.dataset.persist = 'false';
+  audioTip.classList.remove('is-open');
+  audioTip.classList.add('hidden');
+}
+
+function isAudioTipPersistent() {
+  return audioTip?.dataset.persist === 'true';
+}
+
+function isAudioContextOffDuringPlay() {
+  return isPlaying
+    && audioContext
+    && ['suspended', 'interrupted', 'closed'].includes(audioContext.state);
+}
+
+function hasLowOrMutedGameAudio() {
+  const trackedAudio = [];
+
+  if (openingAudio) {
+    trackedAudio.push(openingAudio);
+  }
+
+  birdCallNodes.forEach(({ audio }) => {
+    trackedAudio.push(audio);
+  });
+
+  return trackedAudio.some(audio => (
+    audio.muted || audio.volume < LOW_MEDIA_VOLUME_THRESHOLD
+  ));
+}
+
+function hasAudioOutputIssue() {
+  return hasLowOrMutedGameAudio() || isAudioContextOffDuringPlay();
+}
+
+function reconcileAudioTip() {
+  if (hasAudioOutputIssue()) {
+    showAudioTip(AUDIO_TIP_BLOCKED_MESSAGE, { persist: true });
+    return;
+  }
+
+  if (isAudioTipPersistent()) {
+    hideAudioTip();
+  }
+}
+
+function ensureMediaElementAudible(audio, recommendedVolume) {
+  if (!audio) {
+    return false;
+  }
+
+  const targetVolume = Math.min(
+    1,
+    Math.max(recommendedVolume, LOW_MEDIA_VOLUME_THRESHOLD),
+  );
+  let adjusted = false;
+
+  if (audio.muted) {
+    audio.muted = false;
+    adjusted = true;
+  }
+
+  if (audio.volume < LOW_MEDIA_VOLUME_THRESHOLD) {
+    audio.volume = targetVolume;
+    adjusted = true;
+  }
+
+  return adjusted;
+}
+
+function ensureGameAudioLevels() {
+  let adjusted = false;
+
+  if (openingAudio) {
+    adjusted = ensureMediaElementAudible(openingAudio, OPENING_AUDIO_VOLUME) || adjusted;
+  }
+
+  birdCallNodes.forEach(({ audio }) => {
+    adjusted = ensureMediaElementAudible(audio, BIRD_AUDIO_ELEMENT_VOLUME) || adjusted;
+  });
+
+  if (adjusted) {
+    showAudioTip(AUDIO_TIP_BOOSTED_MESSAGE);
+  }
+
+  return adjusted;
+}
+
+function handleTrackedAudioLevelChange(audio, recommendedVolume) {
+  const adjusted = ensureMediaElementAudible(audio, recommendedVolume);
+
+  if (adjusted) {
+    showAudioTip(AUDIO_TIP_BOOSTED_MESSAGE);
+  }
+
+  reconcileAudioTip();
+}
+
+function trackGameAudioElement(audio, recommendedVolume) {
+  audio.addEventListener('volumechange', () => {
+    handleTrackedAudioLevelChange(audio, recommendedVolume);
+  });
+  audio.addEventListener('playing', reconcileAudioTip);
+  audio.addEventListener('pause', reconcileAudioTip);
+}
+
+function watchAudioContextState(context) {
+  if (!context || isAudioContextWatched || !context.addEventListener) {
+    return;
+  }
+
+  isAudioContextWatched = true;
+  context.addEventListener('statechange', reconcileAudioTip);
 }
 
 function getOpeningAudio() {
@@ -324,6 +496,7 @@ function getOpeningAudio() {
     openingAudio.loop = true;
     openingAudio.preload = 'auto';
     openingAudio.volume = OPENING_AUDIO_VOLUME;
+    trackGameAudioElement(openingAudio, OPENING_AUDIO_VOLUME);
   }
 
   return openingAudio;
@@ -332,17 +505,22 @@ function getOpeningAudio() {
 function playOpeningAudio() {
   const audio = getOpeningAudio();
 
+  ensureGameAudioLevels();
+
   if (!audio.paused) {
+    reconcileAudioTip();
     return;
   }
 
   const playPromise = audio.play();
 
   if (playPromise) {
-    playPromise.catch(err => {
+    playPromise.then(reconcileAudioTip).catch(err => {
       if (err.name !== 'NotAllowedError') {
         console.log('Opening audio playback failed:', err);
       }
+
+      showAudioTip(AUDIO_TIP_BLOCKED_MESSAGE, { persist: true });
     });
   }
 }
@@ -392,6 +570,7 @@ function initializeBirdCallAudio() {
     const audio = new Audio(birdCallSources[id]);
     audio.loop = true;
     audio.preload = 'auto';
+    trackGameAudioElement(audio, BIRD_AUDIO_ELEMENT_VOLUME);
 
     const source = context.createMediaElementSource(audio);
     const filter = context.createBiquadFilter();
@@ -441,7 +620,7 @@ function updateBirdCallAudio() {
       foundBirds,
       {
         maxDistance: hintDistance,
-        maxVolume: 0.24,
+        maxVolume: BIRD_CALL_MAX_VOLUME,
         maxPan: 0.62,
         panDistance: hintDistance * 0.78,
       },
@@ -473,11 +652,14 @@ function startBirdCalls() {
     return;
   }
 
+  ensureGameAudioLevels();
+
   const resumePromise = context.resume?.();
 
   if (resumePromise) {
-    resumePromise.catch(err => {
+    resumePromise.then(reconcileAudioTip).catch(err => {
       console.log('Audio context resume failed:', err);
+      showAudioTip(AUDIO_TIP_BLOCKED_MESSAGE, { persist: true });
     });
   }
 
@@ -493,6 +675,7 @@ function startBirdCalls() {
     if (playPromise) {
       playPromise.catch(err => {
         console.log('Bird call playback failed:', err);
+        showAudioTip(AUDIO_TIP_BLOCKED_MESSAGE, { persist: true });
       });
     }
   });
@@ -733,6 +916,7 @@ function rectsOverlap(firstRect, secondRect) {
 function startGame() {
   requestPortableFullscreen();
   playOpeningAudio();
+  showAudioTip(AUDIO_TIP_REMINDER_MESSAGE);
 
   startScreen.classList.remove('active');
   endScreen.classList.remove('active');
@@ -806,6 +990,7 @@ function startGameLogic() {
   gameInterval = setInterval(gameLoop, 1000);
 
   startBirdCalls();
+  showAudioTip(AUDIO_TIP_REMINDER_MESSAGE);
 }
 
 function showEndScreen(presentation) {
@@ -844,6 +1029,7 @@ function endGame(result) {
   guessFeedback.classList.add('hidden');
   
   pauseBirdCalls();
+  hideAudioTip();
   const isNewHighScore = updateHighScore();
   renderEndScoreSummary(isNewHighScore);
   const presentation = getEndGamePresentation(result, timeRemaining);
@@ -972,6 +1158,48 @@ function handlePointerCancel(event) {
   releaseTrackedPointer(event.pointerId);
 }
 
+function playActiveBirdCalls() {
+  if (birdCallNodes.size === 0) {
+    startBirdCalls();
+    return;
+  }
+
+  const resumePromise = audioContext?.resume?.();
+
+  if (resumePromise) {
+    resumePromise.then(reconcileAudioTip).catch(err => {
+      console.log('Audio context resume failed:', err);
+      showAudioTip(AUDIO_TIP_BLOCKED_MESSAGE, { persist: true });
+    });
+  }
+
+  birdCallNodes.forEach(({ audio }) => {
+    const playPromise = audio.play();
+
+    if (playPromise) {
+      playPromise.catch(err => {
+        console.log('Bird call playback failed:', err);
+        showAudioTip(AUDIO_TIP_BLOCKED_MESSAGE, { persist: true });
+      });
+    }
+  });
+
+  updateBirdCallAudio();
+}
+
+function handleAudioTipButtonClick() {
+  const adjusted = ensureGameAudioLevels();
+
+  if (isPlaying) {
+    playActiveBirdCalls();
+  } else if (startScreen.classList.contains('active') || videoScreen.classList.contains('active')) {
+    playOpeningAudio();
+  }
+
+  showAudioTip(adjusted ? AUDIO_TIP_BOOSTED_MESSAGE : AUDIO_TIP_REMINDER_MESSAGE);
+  reconcileAudioTip();
+}
+
 guessBtns.forEach(btn => {
   btn.addEventListener('click', (e) => {
     const guessedBird = e.target.getAttribute('data-bird');
@@ -1026,6 +1254,7 @@ startBtn.addEventListener('click', startGame);
 restartBtn.addEventListener('click', startGame);
 tutorialStartBtn.addEventListener('click', startGameLogic);
 identifyBtn.addEventListener('click', handleRegister);
+audioTipButton.addEventListener('click', handleAudioTipButtonClick);
 
 gameContainer.addEventListener('pointerdown', handlePointerDown);
 gameContainer.addEventListener('pointermove', handlePointerMove);

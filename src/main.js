@@ -6,6 +6,7 @@ import {
   getEndGamePresentation,
   getFlashlightPositions,
   getStreakFeedback,
+  isTapInteraction,
   isGameOver,
   getRandomBirdPosition,
 } from './gameLogic.js';
@@ -64,6 +65,7 @@ let isGuessing = false;
 let currentBirdTarget = null;
 let currentBirdCandidate = null;
 let activePointerId = null;
+let pointerStartPosition = null;
 let endGameTimeout = null;
 let streakFeedbackTimeout = null;
 let currentControlMode = 'mouse';
@@ -520,6 +522,7 @@ function startGameLogic() {
   currentBirdTarget = null;
   currentBirdCandidate = null;
   activePointerId = null;
+  pointerStartPosition = null;
   currentControlMode = 'mouse';
   tutorialModal.classList.add('hidden');
   guessModal.classList.add('hidden');
@@ -584,6 +587,7 @@ function endGame(result) {
   currentBirdCandidate = null;
   correctStreak = 0;
   activePointerId = null;
+  pointerStartPosition = null;
   clearInterval(gameInterval);
   gameInterval = null;
   setBirdCandidate(null);
@@ -647,6 +651,7 @@ function releaseTrackedPointer(pointerId) {
   }
 
   activePointerId = null;
+  pointerStartPosition = null;
 }
 
 function handlePointerDown(event) {
@@ -655,6 +660,7 @@ function handlePointerDown(event) {
   }
 
   const controlMode = event.pointerType === 'mouse' ? 'mouse' : 'touch';
+  pointerStartPosition = { x: event.clientX, y: event.clientY };
 
   if (event.pointerType !== 'mouse') {
     event.preventDefault();
@@ -690,6 +696,13 @@ function handlePointerUp(event) {
     return;
   }
 
+  const isMouseClick = event.pointerType === 'mouse'
+    && event.button === 0
+    && isTapInteraction(
+      pointerStartPosition,
+      { x: event.clientX, y: event.clientY },
+    );
+
   if (event.pointerType !== 'mouse') {
     event.preventDefault();
   }
@@ -701,6 +714,10 @@ function handlePointerUp(event) {
   );
 
   releaseTrackedPointer(event.pointerId);
+
+  if (isMouseClick) {
+    handleRegister();
+  }
 }
 
 function handlePointerCancel(event) {

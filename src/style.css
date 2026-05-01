@@ -288,11 +288,13 @@ p {
 /* HUD */
 #hud-top {
   position: absolute;
-  top: 20px;
-  left: 20px;
-  right: 20px;
+  top: max(14px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
+  right: max(16px, env(safe-area-inset-right));
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 16px;
   z-index: 20;
   pointer-events: none;
 }
@@ -306,14 +308,16 @@ p {
 }
 
 #hud-stats {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .score-row {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  padding-top: 7px;
 }
 
 .score-row span {
@@ -618,8 +622,24 @@ p {
     font-size: 1rem;
   }
 
+  #hud-top {
+    top: max(10px, env(safe-area-inset-top));
+    left: max(10px, env(safe-area-inset-left));
+    right: max(10px, env(safe-area-inset-right));
+    gap: 10px;
+  }
+
+  #hud-stats {
+    gap: 6px;
+  }
+
   #timer {
     font-size: 2.2rem;
+  }
+
+  .score-row {
+    gap: 5px;
+    padding-top: 4px;
   }
 
   .score-row span {
@@ -647,5 +667,44 @@ p {
 
   .sighting-panel {
     align-items: stretch;
+  }
+}
+
+@media screen and (max-height: 500px) and (orientation: landscape) {
+  #hud-top {
+    top: max(8px, env(safe-area-inset-top));
+  }
+
+  #great_horned_owl { width: 104px; }
+  #western_screech_owl { width: 78px; }
+  #barn_owl { width: 96px; }
+  #common_poorwill { width: 70px; }
+
+  #timer {
+    font-size: 2rem;
+  }
+
+  #checklist {
+    padding: 8px 10px;
+  }
+
+  #checklist h3 {
+    margin-bottom: 6px;
+    font-size: 0.95rem;
+  }
+
+  #checklist li {
+    margin-bottom: 3px;
+    font-size: 0.82rem;
+  }
+
+  .score-row span {
+    min-height: 26px;
+    padding: 4px 7px;
+    font-size: 0.66rem;
+  }
+
+  .score-row strong {
+    font-size: 0.82rem;
   }
 }

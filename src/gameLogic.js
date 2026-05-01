@@ -115,6 +115,53 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+const BIRD_POSITION_DEFAULTS = {
+  topMin: 30,
+  topMax: 72,
+  leftMin: 8,
+  leftMax: 84,
+  checklistTopMax: 52,
+  checklistLeftMin: 52,
+  minHorizontalGap: 24,
+  minVerticalGap: 18,
+  maxAttempts: 160,
+};
+
+const FALLBACK_BIRD_POSITIONS = [
+  { top: 34, left: 10 },
+  { top: 34, left: 34 },
+  { top: 54, left: 18 },
+  { top: 54, left: 62 },
+  { top: 68, left: 40 },
+];
+
+function getBirdPositionOptions(options = {}) {
+  return {
+    ...BIRD_POSITION_DEFAULTS,
+    ...options,
+  };
+}
+
+function isInReservedHudZone(position, options) {
+  return position.top < options.checklistTopMax
+    && position.left > options.checklistLeftMin;
+}
+
+function overlapsExistingBird(position, existingPositions, options) {
+  return existingPositions.some(existingPosition => {
+    const horizontalDistance = Math.abs(position.left - existingPosition.left);
+    const verticalDistance = Math.abs(position.top - existingPosition.top);
+
+    return horizontalDistance < options.minHorizontalGap
+      && verticalDistance < options.minVerticalGap;
+  });
+}
+
+function isValidBirdPosition(position, existingPositions, options) {
+  return !isInReservedHudZone(position, options)
+    && !overlapsExistingBird(position, existingPositions, options);
+}
+
 /**
  * Calculates directional audio mix values for hidden bird calls.
  * @param {number} spotlightX - The x coordinate of the flashlight center.
@@ -249,25 +296,37 @@ export function getFlashlightPositions(
 }
 
 /**
- * Generates a random coordinate for a bird, avoiding the top-right checklist UI area.
+ * Generates a random coordinate for a bird, avoiding HUD zones and other birds.
+ * @param {Array<{top: number, left: number}>} existingPositions - Bird positions already chosen.
+ * @param {{topMin?: number, topMax?: number, leftMin?: number, leftMax?: number, checklistTopMax?: number, checklistLeftMin?: number, minHorizontalGap?: number, minVerticalGap?: number, maxAttempts?: number}} options - Placement tuning values.
  * @returns {{top: number, left: number}}
  */
-export function getRandomBirdPosition() {
-  let randomTop, randomLeft;
-  let isValidPosition = false;
+export function getRandomBirdPosition(existingPositions = [], options = {}) {
+  const placementOptions = getBirdPositionOptions(options);
+  const topRange = placementOptions.topMax - placementOptions.topMin;
+  const leftRange = placementOptions.leftMax - placementOptions.leftMin;
 
-  while (!isValidPosition) {
-    // Randomize between 10% and 85% for top and left to keep them on screen
-    randomTop = Math.floor(Math.random() * 75) + 10;
-    randomLeft = Math.floor(Math.random() * 75) + 10;
+  for (let attempt = 0; attempt < placementOptions.maxAttempts; attempt++) {
+    const position = {
+      top: Math.floor(Math.random() * topRange) + placementOptions.topMin,
+      left: Math.floor(Math.random() * leftRange) + placementOptions.leftMin,
+    };
 
-    // Avoid top-right corner where the "Birds Found" checklist is located
-    const isInChecklistZone = randomTop < 45 && randomLeft > 55;
-    
-    if (!isInChecklistZone) {
-      isValidPosition = true;
+    if (isValidBirdPosition(position, existingPositions, placementOptions)) {
+      return position;
     }
   }
 
-  return { top: randomTop, left: randomLeft };
+  const fallbackPosition = FALLBACK_BIRD_POSITIONS.find(position => (
+    isValidBirdPosition(position, existingPositions, placementOptions)
+  ));
+
+  if (fallbackPosition) {
+    return fallbackPosition;
+  }
+
+  return {
+    top: placementOptions.topMin,
+    left: placementOptions.leftMin,
+  };
 }

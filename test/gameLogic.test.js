@@ -208,17 +208,35 @@ describe('gameLogic', () => {
   });
 
   describe('getRandomBirdPosition', () => {
-    it('should generate valid coordinates avoiding the top-right corner', () => {
+    function positionsOverlap(firstPosition, secondPosition) {
+      const horizontalDistance = Math.abs(firstPosition.left - secondPosition.left);
+      const verticalDistance = Math.abs(firstPosition.top - secondPosition.top);
+
+      return horizontalDistance < 24 && verticalDistance < 18;
+    }
+
+    it('should generate valid coordinates avoiding HUD zones', () => {
       for (let i = 0; i < 100; i++) {
         const pos = getRandomBirdPosition();
         
-        expect(pos.top).toBeGreaterThanOrEqual(10);
-        expect(pos.top).toBeLessThanOrEqual(85);
-        expect(pos.left).toBeGreaterThanOrEqual(10);
-        expect(pos.left).toBeLessThanOrEqual(85);
+        expect(pos.top).toBeGreaterThanOrEqual(30);
+        expect(pos.top).toBeLessThanOrEqual(72);
+        expect(pos.left).toBeGreaterThanOrEqual(8);
+        expect(pos.left).toBeLessThanOrEqual(84);
 
-        const isInChecklistZone = pos.top < 45 && pos.left > 55;
+        const isInChecklistZone = pos.top < 52 && pos.left > 52;
         expect(isInChecklistZone).toBe(false);
+      }
+    });
+
+    it('should avoid positions already assigned to other birds', () => {
+      const positions = [];
+
+      for (let i = 0; i < 4; i++) {
+        const pos = getRandomBirdPosition(positions);
+
+        expect(positions.some(existingPosition => positionsOverlap(pos, existingPosition))).toBe(false);
+        positions.push(pos);
       }
     });
   });

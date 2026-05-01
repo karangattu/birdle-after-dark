@@ -51,6 +51,7 @@ const FLASHLIGHT_RADIUS = 40;
 const TOTAL_BIRDS = 4;
 const HIGH_SCORE_STORAGE_KEY = 'birdle-after-dark-high-score';
 const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
+const PORTABLE_FULLSCREEN_QUERY = '(pointer: coarse), (any-pointer: coarse)';
 
 let timeRemaining = GAME_DURATION;
 let foundBirds = new Set();
@@ -117,6 +118,35 @@ function clearPendingEndGame() {
   if (endGameTimeout) {
     window.clearTimeout(endGameTimeout);
     endGameTimeout = null;
+  }
+}
+
+function isPortableDevice() {
+  return navigator.maxTouchPoints > 0
+    || window.matchMedia(PORTABLE_FULLSCREEN_QUERY).matches;
+}
+
+function getFullscreenElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+
+function requestPortableFullscreen() {
+  if (!isPortableDevice() || getFullscreenElement()) {
+    return;
+  }
+
+  const root = document.documentElement;
+
+  try {
+    const fullscreenPromise = root.requestFullscreen
+      ? root.requestFullscreen({ navigationUI: 'hide' })
+      : root.webkitRequestFullscreen?.();
+
+    fullscreenPromise?.catch(err => {
+      console.log('Fullscreen request failed:', err);
+    });
+  } catch (err) {
+    console.log('Fullscreen request failed:', err);
   }
 }
 
@@ -489,6 +519,8 @@ function randomizeBirds() {
 }
 
 function startGame() {
+  requestPortableFullscreen();
+
   startScreen.classList.remove('active');
   endScreen.classList.remove('active');
   videoScreen.classList.add('active');
@@ -512,6 +544,8 @@ function showTutorial() {
 }
 
 function startGameLogic() {
+  requestPortableFullscreen();
+
   clearPendingEndGame();
   timeRemaining = GAME_DURATION;
   foundBirds.clear();

@@ -24,7 +24,8 @@ export default defineConfig({
         scope: '/birdle-after-dark/',
         theme_color: '#0a0a0a',
         background_color: '#0a0a0a',
-        display: 'standalone',
+        display: 'fullscreen',
+        display_override: ['fullscreen', 'standalone'],
         orientation: 'landscape',
         icons: [
           {

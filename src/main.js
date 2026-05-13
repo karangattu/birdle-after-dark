@@ -304,7 +304,7 @@ async function loadGlobalHighScore() {
   }
 
   if (globalHighScore > 0) {
-    startHighScore.innerHTML = `<span>Global Best <strong>${formatScore(globalHighScore)}</strong></span>`;
+    startHighScore.innerHTML = `<span>High Score <strong>${formatScore(globalHighScore)}</strong></span>`;
   }
 }
 

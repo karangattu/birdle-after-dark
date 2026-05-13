@@ -47,7 +47,19 @@
         <img src="/assets/game_poster.png" alt="" id="start-poster" />
       </div>
       <div class="start-content">
+        <div id="start-high-score" class="start-high-score"></div>
         <button id="start-btn" class="primary-btn">Play</button>
+      </div>
+      <div id="install-prompt" class="install-prompt hidden" role="note" aria-live="polite">
+        <div class="install-prompt-copy">
+          <p class="install-prompt-kicker">Quick launch</p>
+          <strong>Install Birdle After Dark</strong>
+          <span>Add it to your home screen for a faster fullscreen play session.</span>
+        </div>
+        <div class="install-prompt-actions">
+          <button id="install-prompt-install-btn" class="install-prompt-install-btn" type="button">Install app</button>
+          <button id="install-prompt-dismiss-btn" class="install-prompt-dismiss-btn" type="button">Not now</button>
+        </div>
       </div>
     </div>
 
@@ -154,6 +166,18 @@
         <h1 id="end-title">Game Over</h1>
         <p id="end-message">You ran out of time.</p>
         <div id="end-score-summary" class="end-score-summary"></div>
+        <div id="leaderboard" class="leaderboard hidden">
+          <h2>Leaderboard</h2>
+          <div id="leaderboard-list" class="leaderboard-list"></div>
+          <div id="leaderboard-name-form" class="leaderboard-name-form hidden">
+            <p>You made the top 5! Enter your name:</p>
+            <div class="leaderboard-name-row">
+              <input id="leaderboard-name-input" type="text" maxlength="20" placeholder="Your name" />
+              <button id="leaderboard-submit-btn" type="button">Submit</button>
+            </div>
+            <p id="leaderboard-name-feedback" class="hidden"></p>
+          </div>
+        </div>
         <button id="restart-btn" class="primary-btn">Play Again</button>
       </div>
     </div>

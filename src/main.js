@@ -10,6 +10,18 @@ import {
   isGameOver,
   getRandomBirdPosition,
 } from './gameLogic.js';
+import {
+  isStandaloneDisplayMode,
+  readInstallPromptDismissed,
+  shouldShowInstallPrompt,
+  writeInstallPromptDismissed,
+} from './installPrompt.js';
+import {
+  fetchHighScore,
+  fetchTopLeaderboard,
+  saveScore,
+  isTopScore,
+} from './leaderboard.js';
 import barnOwlAudioSrc from '../assets/barn_owl.mp3';
 import commonPoorwillAudioSrc from '../assets/common_poorwill.mp3';
 import gameStartAudioSrc from '../assets/game_start_audio.mp3';
@@ -18,6 +30,9 @@ import westernScreechOwlAudioSrc from '../assets/western_screech_owl.mp3';
 
 // DOM Elements
 const startScreen = document.getElementById('start-screen');
+const installPrompt = document.getElementById('install-prompt');
+const installPromptInstallBtn = document.getElementById('install-prompt-install-btn');
+const installPromptDismissBtn = document.getElementById('install-prompt-dismiss-btn');
 const gameScreen = document.getElementById('game-screen');
 const endScreen = document.getElementById('end-screen');
 const gameContainer = document.getElementById('game-container');
@@ -51,6 +66,13 @@ const identifyBtn = document.getElementById('identify-btn');
 const streakFeedback = document.getElementById('streak-feedback');
 const streakFeedbackLabel = document.getElementById('streak-feedback-label');
 const streakFeedbackPoints = document.getElementById('streak-feedback-points');
+const startHighScore = document.getElementById('start-high-score');
+const leaderboard = document.getElementById('leaderboard');
+const leaderboardList = document.getElementById('leaderboard-list');
+const leaderboardNameForm = document.getElementById('leaderboard-name-form');
+const leaderboardNameInput = document.getElementById('leaderboard-name-input');
+const leaderboardSubmitBtn = document.getElementById('leaderboard-submit-btn');
+const leaderboardNameFeedback = document.getElementById('leaderboard-name-feedback');
 
 const GAME_DURATION = 60;
 const FLASHLIGHT_RADIUS = 40;
@@ -100,6 +122,10 @@ let audioContext = null;
 let openingAudio = null;
 let audioTipTimeout = null;
 let isAudioContextWatched = false;
+let deferredInstallPrompt = null;
+let installPromptDismissed = readInstallPromptDismissed(getSafeStorage());
+let leaderboardSubmitted = false;
+let globalHighScore = 0;
 
 // Initialize birds info
 const birdIds = ['great_horned_owl', 'western_screech_owl', 'barn_owl', 'common_poorwill'];
@@ -110,6 +136,14 @@ const birdCallSources = {
   common_poorwill: commonPoorwillAudioSrc,
 };
 const birdCallNodes = new Map();
+
+function getSafeStorage() {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
 
 function registerAppServiceWorker() {
   if (!('serviceWorker' in navigator) || !import.meta.env.PROD) {
@@ -142,6 +176,66 @@ function registerAppServiceWorker() {
     },
   });
 }
+
+function updateInstallPromptVisibility() {
+  if (!installPrompt) {
+    return;
+  }
+
+  installPrompt.classList.toggle(
+    'hidden',
+    !shouldShowInstallPrompt({
+      isStandalone: isStandaloneDisplayMode(window),
+      hasDeferredPrompt: Boolean(deferredInstallPrompt),
+      dismissed: installPromptDismissed,
+    }),
+  );
+}
+
+function handleBeforeInstallPrompt(event) {
+  event.preventDefault();
+
+  if (isStandaloneDisplayMode(window) || installPromptDismissed) {
+    return;
+  }
+
+  deferredInstallPrompt = event;
+  updateInstallPromptVisibility();
+}
+
+async function promptInstallApp() {
+  if (!deferredInstallPrompt) {
+    return;
+  }
+
+  const promptEvent = deferredInstallPrompt;
+  deferredInstallPrompt = null;
+  updateInstallPromptVisibility();
+
+  promptEvent.prompt();
+
+  const choiceResult = promptEvent.userChoice ? await promptEvent.userChoice : null;
+
+  if (choiceResult?.outcome === 'accepted') {
+    installPromptDismissed = false;
+    writeInstallPromptDismissed(getSafeStorage(), false);
+  }
+}
+
+function dismissInstallPrompt() {
+  deferredInstallPrompt = null;
+  installPromptDismissed = true;
+  writeInstallPromptDismissed(getSafeStorage(), true);
+  updateInstallPromptVisibility();
+}
+
+window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  installPromptDismissed = false;
+  writeInstallPromptDismissed(getSafeStorage(), false);
+  updateInstallPromptVisibility();
+});
 
 function clearPendingEndGame() {
   if (endGameTimeout) {
@@ -200,6 +294,90 @@ function storeHighScore(value) {
 
 function formatScore(value) {
   return value.toLocaleString('en-US');
+}
+
+async function loadGlobalHighScore() {
+  try {
+    globalHighScore = await fetchHighScore();
+  } catch {
+    globalHighScore = 0;
+  }
+
+  if (globalHighScore > 0) {
+    startHighScore.innerHTML = `<span>Global Best <strong>${formatScore(globalHighScore)}</strong></span>`;
+  }
+}
+
+function renderLeaderboard(data) {
+  leaderboardList.innerHTML = '';
+
+  if (!data || data.length === 0) {
+    leaderboardList.innerHTML = '<div class="leaderboard-empty">No scores yet. Be the first!</div>';
+    return;
+  }
+
+  const list = document.createElement('ol');
+  list.className = 'leaderboard-ol';
+
+  data.forEach((entry) => {
+    const item = document.createElement('li');
+    item.className = 'leaderboard-li';
+    item.innerHTML = `<span class="leaderboard-name">${escapeHtml(entry.name)}</span><span class="leaderboard-score">${formatScore(entry.score)}</span>`;
+    list.append(item);
+  });
+
+  leaderboardList.append(list);
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.appendChild(document.createTextNode(text));
+  return div.innerHTML;
+}
+
+async function handleScoreSubmission() {
+  const name = leaderboardNameInput.value.trim();
+  if (!name) return;
+
+  leaderboardSubmitBtn.disabled = true;
+  leaderboardNameFeedback.classList.add('hidden');
+
+  const result = await saveScore(name, score);
+
+  if (result) {
+    leaderboardSubmitted = true;
+    leaderboardNameForm.classList.add('hidden');
+    const topData = await fetchTopLeaderboard();
+    renderLeaderboard(topData);
+  } else {
+    leaderboardNameFeedback.classList.remove('hidden');
+    leaderboardNameFeedback.innerText = 'Failed to save. Try again.';
+    leaderboardSubmitBtn.disabled = false;
+  }
+}
+
+async function showEndLeaderboard() {
+  leaderboard.classList.remove('hidden');
+  leaderboardNameForm.classList.add('hidden');
+  leaderboardNameFeedback.classList.add('hidden');
+
+  const topData = await fetchTopLeaderboard();
+  renderLeaderboard(topData);
+
+  if (!leaderboardSubmitted && isTopScore(score, topData)) {
+    leaderboardNameForm.classList.remove('hidden');
+    leaderboardNameInput.value = '';
+    leaderboardSubmitBtn.disabled = false;
+    leaderboardNameInput.focus();
+  }
+}
+
+function resetLeaderboardState() {
+  leaderboardSubmitted = false;
+  leaderboard.classList.add('hidden');
+  leaderboardNameForm.classList.add('hidden');
+  leaderboardNameInput.value = '';
+  leaderboardSubmitBtn.disabled = false;
 }
 
 function updateScoreboard() {
@@ -956,6 +1134,7 @@ function startGameLogic() {
   activePointerId = null;
   pointerStartPosition = null;
   currentControlMode = 'mouse';
+  resetLeaderboardState();
   tutorialModal.classList.add('hidden');
   guessModal.classList.add('hidden');
   guessFeedback.classList.add('hidden');
@@ -1037,6 +1216,7 @@ function endGame(result) {
   if (result === 'win') {
     if (navigator.vibrate) navigator.vibrate([100, 100, 100, 100, 500]); // Victory pattern
     showEndScreen(presentation);
+    showEndLeaderboard();
     return;
   }
 
@@ -1049,6 +1229,7 @@ function endGame(result) {
   endGameTimeout = window.setTimeout(() => {
     endGameTimeout = null;
     showEndScreen(presentation);
+    showEndLeaderboard();
   }, presentation.endScreenDelayMs);
 }
 
@@ -1255,6 +1436,12 @@ restartBtn.addEventListener('click', startGame);
 tutorialStartBtn.addEventListener('click', startGameLogic);
 identifyBtn.addEventListener('click', handleRegister);
 audioTipButton.addEventListener('click', handleAudioTipButtonClick);
+installPromptInstallBtn?.addEventListener('click', promptInstallApp);
+installPromptDismissBtn?.addEventListener('click', dismissInstallPrompt);
+leaderboardSubmitBtn.addEventListener('click', handleScoreSubmission);
+leaderboardNameInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') handleScoreSubmission();
+});
 
 gameContainer.addEventListener('pointerdown', handlePointerDown);
 gameContainer.addEventListener('pointermove', handlePointerMove);
@@ -1268,3 +1455,4 @@ registerAppServiceWorker();
 updateScoreboard();
 updateFlashlight(window.innerWidth / 2, window.innerHeight / 2);
 playOpeningAudio();
+loadGlobalHighScore();

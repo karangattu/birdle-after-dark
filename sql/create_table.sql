@@ -1,16 +1,20 @@
-CREATE TABLE after_dark_leaderboard (
+CREATE TABLE IF NOT EXISTS public.after_dark_leaderboard (
   id BIGSERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   score INTEGER NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE after_dark_leaderboard ENABLE ROW LEVEL SECURITY;
+GRANT SELECT, INSERT ON TABLE public.after_dark_leaderboard TO anon;
 
-CREATE POLICY "Allow public select" ON after_dark_leaderboard
+ALTER TABLE public.after_dark_leaderboard ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public select" ON public.after_dark_leaderboard;
+CREATE POLICY "Allow public select" ON public.after_dark_leaderboard
   FOR SELECT USING (true);
 
-CREATE POLICY "Allow public insert" ON after_dark_leaderboard
+DROP POLICY IF EXISTS "Allow public insert" ON public.after_dark_leaderboard;
+CREATE POLICY "Allow public insert" ON public.after_dark_leaderboard
   FOR INSERT WITH CHECK (true);
 
-CREATE INDEX idx_after_dark_leaderboard_score ON after_dark_leaderboard (score DESC);
+CREATE INDEX IF NOT EXISTS idx_after_dark_leaderboard_score ON public.after_dark_leaderboard (score DESC);

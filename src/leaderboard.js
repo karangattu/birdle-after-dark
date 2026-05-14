@@ -2,6 +2,21 @@ import { getSupabaseClient } from './supabase.js';
 
 const TABLE = 'after_dark_leaderboard';
 const TOP_N = 5;
+const FETCH_LIMIT = 50;
+
+function deduplicateByBestScore(entries) {
+  const bestBy = new Map();
+
+  for (const entry of entries) {
+    const current = bestBy.get(entry.name);
+    if (!current || entry.score > current.score) {
+      bestBy.set(entry.name, entry.score);
+    }
+  }
+
+  return Array.from(bestBy, ([name, score]) => ({ name, score }))
+    .sort((a, b) => b.score - a.score);
+}
 
 export async function fetchHighScore() {
   const supabase = getSupabaseClient();
@@ -10,13 +25,14 @@ export async function fetchHighScore() {
   try {
     const { data, error } = await supabase
       .from(TABLE)
-      .select('score')
+      .select('name, score')
       .order('score', { ascending: false })
-      .limit(1)
-      .single();
+      .limit(FETCH_LIMIT);
 
-    if (error || !data) return 0;
-    return data.score;
+    if (error) return 0;
+
+    const deduped = deduplicateByBestScore(data ?? []);
+    return deduped.length > 0 ? deduped[0].score : 0;
   } catch {
     return 0;
   }
@@ -31,10 +47,12 @@ export async function fetchTopLeaderboard() {
       .from(TABLE)
       .select('name, score')
       .order('score', { ascending: false })
-      .limit(TOP_N);
+      .limit(FETCH_LIMIT);
 
     if (error) return [];
-    return data ?? [];
+
+    const deduped = deduplicateByBestScore(data ?? []);
+    return deduped.slice(0, TOP_N);
   } catch {
     return [];
   }

@@ -82,7 +82,6 @@ const GAME_DURATION_REGULAR = 60;
 const GAME_DURATION_EXPERT = 40;
 const FLASHLIGHT_RADIUS = 40;
 const TOTAL_BIRDS = 4;
-const HIGH_SCORE_STORAGE_KEY = 'birdle-after-dark-high-score';
 const HIGH_SCORE_REGULAR_KEY = 'birdle-after-dark-high-score-regular';
 const HIGH_SCORE_EXPERT_KEY = 'birdle-after-dark-high-score-expert';
 const GAME_MODE_STORAGE_KEY = 'birdle-after-dark-game-mode';
@@ -375,8 +374,6 @@ function initializeMovingBirds() {
 
 function updateMovingBirds(deltaTime) {
   if (gameMode !== 'expert') return;
-
-  const containerRect = gameContainer.getBoundingClientRect();
 
   MOVING_BIRD_IDS.forEach(id => {
     const state = movingBirdsState.get(id);

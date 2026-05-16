@@ -18,7 +18,7 @@ function deduplicateByBestScore(entries) {
     .sort((a, b) => b.score - a.score);
 }
 
-export async function fetchHighScore() {
+export async function fetchHighScore(gameMode = 'regular') {
   const supabase = getSupabaseClient();
   if (!supabase) return 0;
 
@@ -26,6 +26,7 @@ export async function fetchHighScore() {
     const { data, error } = await supabase
       .from(TABLE)
       .select('name, score')
+      .eq('game_mode', gameMode)
       .order('score', { ascending: false })
       .limit(FETCH_LIMIT);
 
@@ -38,7 +39,7 @@ export async function fetchHighScore() {
   }
 }
 
-export async function fetchTopLeaderboard() {
+export async function fetchTopLeaderboard(gameMode = 'regular') {
   const supabase = getSupabaseClient();
   if (!supabase) return [];
 
@@ -46,6 +47,7 @@ export async function fetchTopLeaderboard() {
     const { data, error } = await supabase
       .from(TABLE)
       .select('name, score')
+      .eq('game_mode', gameMode)
       .order('score', { ascending: false })
       .limit(FETCH_LIMIT);
 
@@ -58,14 +60,14 @@ export async function fetchTopLeaderboard() {
   }
 }
 
-export async function saveScore(name, score) {
+export async function saveScore(name, score, gameMode = 'regular') {
   const supabase = getSupabaseClient();
   if (!supabase) return null;
 
   try {
     const { data, error } = await supabase
       .from(TABLE)
-      .insert({ name, score })
+      .insert({ name, score, game_mode: gameMode })
       .select()
       .single();
 

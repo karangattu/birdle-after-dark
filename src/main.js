@@ -27,6 +27,8 @@ import commonPoorwillAudioSrc from '../assets/common_poorwill.mp3';
 import gameStartAudioSrc from '../assets/game_start_audio.mp3';
 import greatHornedOwlAudioSrc from '../assets/great_horned_owl.mp3';
 import westernScreechOwlAudioSrc from '../assets/western_screech_owl.mp3';
+import westernScreechOwlFlyingSrc from '../assets/western_screech_owl_flying.png';
+import commonPoorwillFlyingSrc from '../assets/common_poorwill_flying.png';
 
 // DOM Elements
 const startScreen = document.getElementById('start-screen');
@@ -38,6 +40,8 @@ const endScreen = document.getElementById('end-screen');
 const gameContainer = document.getElementById('game-container');
 const startBtn = document.getElementById('start-btn');
 const restartBtn = document.getElementById('restart-btn');
+const modeRegularBtn = document.getElementById('mode-regular-btn');
+const modeExpertBtn = document.getElementById('mode-expert-btn');
 const timerEl = document.getElementById('timer');
 const scoreCountEl = document.getElementById('score-count');
 const highScoreCountEl = document.getElementById('high-score-count');
@@ -74,10 +78,14 @@ const leaderboardNameInput = document.getElementById('leaderboard-name-input');
 const leaderboardSubmitBtn = document.getElementById('leaderboard-submit-btn');
 const leaderboardNameFeedback = document.getElementById('leaderboard-name-feedback');
 
-const GAME_DURATION = 60;
+const GAME_DURATION_REGULAR = 60;
+const GAME_DURATION_EXPERT = 40;
 const FLASHLIGHT_RADIUS = 40;
 const TOTAL_BIRDS = 4;
 const HIGH_SCORE_STORAGE_KEY = 'birdle-after-dark-high-score';
+const HIGH_SCORE_REGULAR_KEY = 'birdle-after-dark-high-score-regular';
+const HIGH_SCORE_EXPERT_KEY = 'birdle-after-dark-high-score-expert';
+const GAME_MODE_STORAGE_KEY = 'birdle-after-dark-game-mode';
 const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
 const PORTABLE_FULLSCREEN_QUERY = '(pointer: coarse), (any-pointer: coarse)';
 const BIRD_PLACEMENT_PADDING = 18;
@@ -91,6 +99,8 @@ const AUDIO_TIP_HIDE_DELAY_MS = 6500;
 const AUDIO_TIP_REMINDER_MESSAGE = 'Turn up sound for the best bird-call clues.';
 const AUDIO_TIP_BOOSTED_MESSAGE = 'Game audio is back up. Check your device volume too.';
 const AUDIO_TIP_BLOCKED_MESSAGE = 'Tap the speaker to retry audio, then check device volume.';
+const MOVING_BIRD_IDS = ['western_screech_owl', 'common_poorwill'];
+const MOVING_BIRD_SPEED = 0.12;
 const BIRD_DOM_FALLBACK_POSITIONS = [
   { top: 38, left: 0 },
   { top: 38, left: 30 },
@@ -101,7 +111,7 @@ const BIRD_DOM_FALLBACK_POSITIONS = [
   { top: 56, left: 72 },
 ];
 
-let timeRemaining = GAME_DURATION;
+let timeRemaining = GAME_DURATION_REGULAR;
 let foundBirds = new Set();
 let score = 0;
 let highScore = readStoredHighScore();
@@ -126,6 +136,9 @@ let deferredInstallPrompt = null;
 let installPromptDismissed = readInstallPromptDismissed(getSafeStorage());
 let leaderboardSubmitted = false;
 let globalHighScore = 0;
+let gameMode = 'regular';
+let movingBirdsState = new Map();
+let animationFrameId = null;
 
 // Initialize birds info
 const birdIds = ['great_horned_owl', 'western_screech_owl', 'barn_owl', 'common_poorwill'];
@@ -134,6 +147,10 @@ const birdCallSources = {
   western_screech_owl: westernScreechOwlAudioSrc,
   barn_owl: barnOwlAudioSrc,
   common_poorwill: commonPoorwillAudioSrc,
+};
+const birdFlyingSources = {
+  western_screech_owl: westernScreechOwlFlyingSrc,
+  common_poorwill: commonPoorwillFlyingSrc,
 };
 const birdCallNodes = new Map();
 
@@ -274,8 +291,9 @@ function requestPortableFullscreen() {
 }
 
 function readStoredHighScore() {
+  const key = gameMode === 'expert' ? HIGH_SCORE_EXPERT_KEY : HIGH_SCORE_REGULAR_KEY;
   try {
-    const storedValue = window.localStorage.getItem(HIGH_SCORE_STORAGE_KEY);
+    const storedValue = window.localStorage.getItem(key);
     const parsedValue = Number.parseInt(storedValue, 10);
 
     return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 0;
@@ -285,8 +303,9 @@ function readStoredHighScore() {
 }
 
 function storeHighScore(value) {
+  const key = gameMode === 'expert' ? HIGH_SCORE_EXPERT_KEY : HIGH_SCORE_REGULAR_KEY;
   try {
-    window.localStorage.setItem(HIGH_SCORE_STORAGE_KEY, String(value));
+    window.localStorage.setItem(key, String(value));
   } catch {
     // Ignore storage failures so private browsing modes remain playable.
   }
@@ -296,15 +315,203 @@ function formatScore(value) {
   return value.toLocaleString('en-US');
 }
 
+function loadGameMode() {
+  try {
+    const stored = window.localStorage.getItem(GAME_MODE_STORAGE_KEY);
+    if (stored === 'expert' || stored === 'regular') {
+      return stored;
+    }
+  } catch {
+    // Ignore
+  }
+  return 'regular';
+}
+
+function saveGameMode(mode) {
+  try {
+    window.localStorage.setItem(GAME_MODE_STORAGE_KEY, mode);
+  } catch {
+    // Ignore
+  }
+}
+
+function updateModeButtons() {
+  modeRegularBtn.classList.toggle('active', gameMode === 'regular');
+  modeExpertBtn.classList.toggle('active', gameMode === 'expert');
+}
+
+function initializeMovingBirds() {
+  movingBirdsState.clear();
+  const containerRect = gameContainer.getBoundingClientRect();
+
+  MOVING_BIRD_IDS.forEach(id => {
+    const horizontal = Math.random() > 0.5;
+    const direction = Math.random() > 0.5 ? 1 : -1;
+
+    let startX, startY, velocityX, velocityY;
+
+    if (horizontal) {
+      startX = direction > 0 ? -5 : containerRect.width + 5;
+      startY = containerRect.height * (0.25 + Math.random() * 0.45);
+      velocityX = direction * MOVING_BIRD_SPEED * containerRect.width;
+      velocityY = (Math.random() - 0.5) * 0.03 * containerRect.height;
+    } else {
+      startX = containerRect.width * (0.2 + Math.random() * 0.6);
+      startY = direction > 0 ? -5 : containerRect.height + 5;
+      velocityX = (Math.random() - 0.5) * 0.04 * containerRect.width;
+      velocityY = direction * MOVING_BIRD_SPEED * containerRect.height;
+    }
+
+    movingBirdsState.set(id, {
+      xPercent: (startX / containerRect.width) * 100,
+      yPercent: (startY / containerRect.height) * 100,
+      velocityXPercent: (velocityX / containerRect.width) * 100,
+      velocityYPercent: (velocityY / containerRect.height) * 100,
+      isMoving: true,
+      isFrozen: false,
+    });
+  });
+}
+
+function updateMovingBirds(deltaTime) {
+  if (gameMode !== 'expert') return;
+
+  const containerRect = gameContainer.getBoundingClientRect();
+
+  MOVING_BIRD_IDS.forEach(id => {
+    const state = movingBirdsState.get(id);
+    if (!state || state.isFrozen || foundBirds.has(id)) return;
+
+    state.xPercent += state.velocityXPercent * deltaTime;
+    state.yPercent += state.velocityYPercent * deltaTime;
+
+    const el = document.getElementById(id);
+    el.style.left = `${state.xPercent}%`;
+    el.style.top = `${state.yPercent}%`;
+
+    if (state.xPercent < -15 || state.xPercent > 115 || state.yPercent < -15 || state.yPercent > 115) {
+      const horizontal = Math.abs(state.velocityXPercent) > Math.abs(state.velocityYPercent);
+      const direction = horizontal
+        ? (state.velocityXPercent > 0 ? -1 : 1)
+        : (state.velocityYPercent > 0 ? -1 : 1);
+
+      if (horizontal) {
+        state.xPercent = direction > 0 ? -5 : 105;
+        state.yPercent = 25 + Math.random() * 45;
+        state.velocityXPercent = direction * MOVING_BIRD_SPEED * 100;
+        state.velocityYPercent = (Math.random() - 0.5) * 3;
+      } else {
+        state.xPercent = 20 + Math.random() * 60;
+        state.yPercent = direction > 0 ? -5 : 105;
+        state.velocityXPercent = (Math.random() - 0.5) * 4;
+        state.velocityYPercent = direction * MOVING_BIRD_SPEED * 100;
+      }
+    }
+  });
+}
+
+function freezeMovingBird(id) {
+  const state = movingBirdsState.get(id);
+  if (state && state.isMoving && !state.isFrozen) {
+    state.isFrozen = true;
+    state.isMoving = false;
+    const el = document.getElementById(id);
+    if (birdFlyingSources[id]) {
+      el.src = el.src.replace('_flying.png', '.png');
+    }
+  }
+}
+
+function checkMovingBirdDetection() {
+  if (gameMode !== 'expert') return;
+
+  const birdsInfo = getBirdsInfo();
+
+  MOVING_BIRD_IDS.forEach(id => {
+    if (foundBirds.has(id)) return;
+    const state = movingBirdsState.get(id);
+    if (!state || state.isFrozen) return;
+
+    const birdInfo = birdsInfo.find(b => b.id === id);
+    if (!birdInfo) return;
+
+    const dx = currentMouseX - birdInfo.x;
+    const dy = currentMouseY - birdInfo.y;
+    const distanceSquared = dx * dx + dy * dy;
+
+    if (distanceSquared <= FLASHLIGHT_RADIUS * FLASHLIGHT_RADIUS) {
+      freezeMovingBird(id);
+    }
+  });
+}
+
+function startMovingBirdAnimation() {
+  if (animationFrameId) return;
+  let lastTime = performance.now();
+
+  const animate = (currentTime) => {
+    if (!isPlaying) {
+      animationFrameId = null;
+      return;
+    }
+
+    const deltaTime = (currentTime - lastTime) / 1000;
+    lastTime = currentTime;
+
+    updateMovingBirds(deltaTime);
+    checkMovingBirdDetection();
+
+    animationFrameId = requestAnimationFrame(animate);
+  };
+
+  animationFrameId = requestAnimationFrame(animate);
+}
+
+function stopMovingBirdAnimation() {
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
+}
+
+function setBirdFlyingImage(id, isFlying) {
+  const el = document.getElementById(id);
+  if (!birdFlyingSources[id]) return;
+
+  if (isFlying) {
+    if (!el.src.includes('_flying.png')) {
+      el.src = birdFlyingSources[id];
+    }
+  } else {
+    if (el.src.includes('_flying.png')) {
+      el.src = birdFlyingSources[id].replace('_flying.png', '.png');
+    }
+  }
+}
+
+function updateBirdImagesForMode() {
+  MOVING_BIRD_IDS.forEach(id => {
+    const state = movingBirdsState.get(id);
+    if (gameMode === 'expert' && state && state.isMoving && !state.isFrozen) {
+      setBirdFlyingImage(id, true);
+    } else {
+      setBirdFlyingImage(id, false);
+    }
+  });
+}
+
 async function loadGlobalHighScore() {
   try {
-    globalHighScore = await fetchHighScore();
+    globalHighScore = await fetchHighScore(gameMode);
   } catch {
     globalHighScore = 0;
   }
 
   if (globalHighScore > 0) {
-    startHighScore.innerHTML = `<span>High Score <strong>${formatScore(globalHighScore)}</strong></span>`;
+    const modeLabel = gameMode === 'expert' ? 'Expert High Score' : 'High Score';
+    startHighScore.innerHTML = `<span>${modeLabel} <strong>${formatScore(globalHighScore)}</strong></span>`;
+  } else {
+    startHighScore.innerHTML = '';
   }
 }
 
@@ -342,12 +549,12 @@ async function handleScoreSubmission() {
   leaderboardSubmitBtn.disabled = true;
   leaderboardNameFeedback.classList.add('hidden');
 
-  const result = await saveScore(name, score);
+  const result = await saveScore(name, score, gameMode);
 
   if (result) {
     leaderboardSubmitted = true;
     leaderboardNameForm.classList.add('hidden');
-    const topData = await fetchTopLeaderboard();
+    const topData = await fetchTopLeaderboard(gameMode);
     renderLeaderboard(topData);
   } else {
     leaderboardNameFeedback.classList.remove('hidden');
@@ -361,7 +568,7 @@ async function showEndLeaderboard() {
   leaderboardNameForm.classList.add('hidden');
   leaderboardNameFeedback.classList.add('hidden');
 
-  const topData = await fetchTopLeaderboard();
+  const topData = await fetchTopLeaderboard(gameMode);
   renderLeaderboard(topData);
 
   if (!leaderboardSubmitted && isTopScore(score, topData)) {
@@ -425,7 +632,9 @@ function updateHighScore() {
 function renderEndScoreSummary(isNewHighScore) {
   endScoreSummary.innerHTML = '';
 
+  const modeLabel = gameMode === 'expert' ? 'Expert' : 'Regular';
   const rows = [
+    ['Mode', modeLabel],
     ['Score', formatScore(score)],
     ['Best', formatScore(highScore)],
   ];
@@ -491,6 +700,30 @@ function getBirdsInfo() {
       x: rect.left + rect.width / 2,
       y: rect.top + rect.height / 2,
     };
+  });
+}
+
+function getMovingBirdsInfo() {
+  if (gameMode !== 'expert') {
+    return getBirdsInfo();
+  }
+
+  return birdIds.map(id => {
+    const el = document.getElementById(id);
+    const state = movingBirdsState.get(id);
+
+    let x, y;
+    if (state && state.isMoving) {
+      const containerRect = gameContainer.getBoundingClientRect();
+      x = containerRect.left + containerRect.width * (state.xPercent / 100);
+      y = containerRect.top + containerRect.height * (state.yPercent / 100);
+    } else {
+      const rect = el.getBoundingClientRect();
+      x = rect.left + rect.width / 2;
+      y = rect.top + rect.height / 2;
+    }
+
+    return { id, x, y };
   });
 }
 
@@ -794,7 +1027,7 @@ function updateBirdCallAudio() {
     ? getDirectionalBirdCallMix(
       currentMouseX,
       currentMouseY,
-      getBirdsInfo(),
+      getMovingBirdsInfo(),
       foundBirds,
       {
         maxDistance: hintDistance,
@@ -889,7 +1122,7 @@ function refreshBirdCandidate() {
   const birdId = getBirdCandidateInBeam(
     currentMouseX,
     currentMouseY,
-    getBirdsInfo(),
+    getMovingBirdsInfo(),
     FLASHLIGHT_RADIUS,
     foundBirds,
   );
@@ -1123,7 +1356,7 @@ function startGameLogic() {
   requestPortableFullscreen();
 
   clearPendingEndGame();
-  timeRemaining = GAME_DURATION;
+  timeRemaining = gameMode === 'expert' ? GAME_DURATION_EXPERT : GAME_DURATION_REGULAR;
   foundBirds.clear();
   score = 0;
   correctStreak = 0;
@@ -1142,7 +1375,7 @@ function startGameLogic() {
   setBirdCandidate(null);
   
   // Reset UI
-  timerEl.innerText = `1:00`;
+  timerEl.innerText = formatTime(timeRemaining);
   updateScoreboard();
   birdsFoundCountEl.innerText = '0';
   birdIds.forEach(id => {
@@ -1161,6 +1394,13 @@ function startGameLogic() {
 
   randomizeBirds();
 
+  if (gameMode === 'expert') {
+    initializeMovingBirds();
+    updateBirdImagesForMode();
+  } else {
+    movingBirdsState.clear();
+  }
+
   const centerPoint = getGameViewportCenter();
   updateFlashlight(centerPoint.x, centerPoint.y, 'mouse');
 
@@ -1169,6 +1409,7 @@ function startGameLogic() {
   gameInterval = setInterval(gameLoop, 1000);
 
   startBirdCalls();
+  startMovingBirdAnimation();
   showAudioTip(AUDIO_TIP_REMINDER_MESSAGE);
 }
 
@@ -1202,6 +1443,7 @@ function endGame(result) {
   pointerStartPosition = null;
   clearInterval(gameInterval);
   gameInterval = null;
+  stopMovingBirdAnimation();
   setBirdCandidate(null);
   clearStreakFeedback();
   guessModal.classList.add('hidden');
@@ -1431,6 +1673,27 @@ guessBtns.forEach(btn => {
 });
 
 // Event Listeners
+modeRegularBtn.addEventListener('click', () => {
+  gameMode = 'regular';
+  saveGameMode(gameMode);
+  updateModeButtons();
+  highScore = readStoredHighScore();
+  updateScoreboard();
+  loadGlobalHighScore();
+});
+
+modeExpertBtn.addEventListener('click', () => {
+  gameMode = 'expert';
+  saveGameMode(gameMode);
+  updateModeButtons();
+  highScore = readStoredHighScore();
+  updateScoreboard();
+  loadGlobalHighScore();
+});
+
+gameMode = loadGameMode();
+updateModeButtons();
+
 startBtn.addEventListener('click', startGame);
 restartBtn.addEventListener('click', startGame);
 tutorialStartBtn.addEventListener('click', startGameLogic);

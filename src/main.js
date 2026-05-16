@@ -113,7 +113,8 @@ const BIRD_DOM_FALLBACK_POSITIONS = [
 let timeRemaining = GAME_DURATION_REGULAR;
 let foundBirds = new Set();
 let score = 0;
-let highScore = readStoredHighScore();
+let gameMode = 'regular';
+let highScore = 0;
 let correctStreak = 0;
 let gameInterval = null;
 let currentMouseX = window.innerWidth / 2;
@@ -135,7 +136,6 @@ let deferredInstallPrompt = null;
 let installPromptDismissed = readInstallPromptDismissed(getSafeStorage());
 let leaderboardSubmitted = false;
 let globalHighScore = 0;
-let gameMode = 'regular';
 let movingBirdsState = new Map();
 let animationFrameId = null;
 
@@ -1689,7 +1689,9 @@ modeExpertBtn.addEventListener('click', () => {
 });
 
 gameMode = loadGameMode();
+highScore = readStoredHighScore();
 updateModeButtons();
+updateScoreboard();
 
 startBtn.addEventListener('click', startGame);
 restartBtn.addEventListener('click', startGame);

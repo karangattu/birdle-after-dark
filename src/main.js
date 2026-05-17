@@ -21,6 +21,8 @@ import {
   fetchTopLeaderboard,
   saveScore,
   isTopScore,
+  subscribeToLeaderboard,
+  unsubscribeFromLeaderboard,
 } from './leaderboard.js';
 import barnOwlAudioSrc from '../assets/barn_owl.mp3';
 import commonPoorwillAudioSrc from '../assets/common_poorwill.mp3';
@@ -541,7 +543,12 @@ function escapeHtml(text) {
 
 async function handleScoreSubmission() {
   const name = leaderboardNameInput.value.trim();
-  if (!name) return;
+  if (!name) {
+    leaderboardNameFeedback.classList.remove('hidden');
+    leaderboardNameFeedback.innerText = 'Please enter your name.';
+    leaderboardNameInput.focus();
+    return;
+  }
 
   leaderboardSubmitBtn.disabled = true;
   leaderboardNameFeedback.classList.add('hidden');
@@ -582,6 +589,14 @@ function resetLeaderboardState() {
   leaderboardNameForm.classList.add('hidden');
   leaderboardNameInput.value = '';
   leaderboardSubmitBtn.disabled = false;
+}
+
+async function handleLeaderboardRealtimeUpdate() {
+  if (!leaderboard.classList.contains('hidden')) {
+    const topData = await fetchTopLeaderboard(gameMode);
+    renderLeaderboard(topData);
+  }
+  await loadGlobalHighScore();
 }
 
 function updateScoreboard() {
@@ -1325,6 +1340,7 @@ function startGame() {
   requestPortableFullscreen();
   playOpeningAudio();
   showAudioTip(AUDIO_TIP_REMINDER_MESSAGE);
+  resetLeaderboardState();
 
   startScreen.classList.remove('active');
   endScreen.classList.remove('active');
@@ -1677,6 +1693,7 @@ modeRegularBtn.addEventListener('click', () => {
   highScore = readStoredHighScore();
   updateScoreboard();
   loadGlobalHighScore();
+  subscribeToLeaderboard(gameMode, handleLeaderboardRealtimeUpdate);
 });
 
 modeExpertBtn.addEventListener('click', () => {
@@ -1686,6 +1703,7 @@ modeExpertBtn.addEventListener('click', () => {
   highScore = readStoredHighScore();
   updateScoreboard();
   loadGlobalHighScore();
+  subscribeToLeaderboard(gameMode, handleLeaderboardRealtimeUpdate);
 });
 
 gameMode = loadGameMode();
@@ -1718,3 +1736,5 @@ updateScoreboard();
 updateFlashlight(window.innerWidth / 2, window.innerHeight / 2);
 playOpeningAudio();
 loadGlobalHighScore();
+subscribeToLeaderboard(gameMode, handleLeaderboardRealtimeUpdate);
+window.addEventListener('beforeunload', unsubscribeFromLeaderboard);

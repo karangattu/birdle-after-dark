@@ -5,7 +5,6 @@ const TOP_N = 5;
 const FETCH_LIMIT = 50;
 
 let activeChannel = null;
-let activeGameMode = null;
 
 function deduplicateByBestScore(entries) {
   const bestBy = new Map();
@@ -107,8 +106,6 @@ export function subscribeToLeaderboard(gameMode, onUpdate) {
   const supabase = getSupabaseClient();
   if (!supabase) return;
 
-  activeGameMode = gameMode;
-
   activeChannel = supabase
     .channel('leaderboard-changes')
     .on(
@@ -133,6 +130,5 @@ export function unsubscribeFromLeaderboard() {
       supabase.removeChannel(activeChannel);
     }
     activeChannel = null;
-    activeGameMode = null;
   }
 }

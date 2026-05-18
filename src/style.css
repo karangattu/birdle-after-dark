@@ -451,6 +451,11 @@ p {
   z-index: 5;
 }
 
+.low-battery #timer {
+  color: #ff4444;
+  animation: timer-pulse 0.5s ease-in-out infinite;
+}
+
 #flashlight-hand {
   position: absolute;
   width: 300px;
@@ -1104,4 +1109,9 @@ p {
   .score-row strong {
     font-size: 0.82rem;
   }
+}
+
+@keyframes timer-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
 }

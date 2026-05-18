@@ -11,6 +11,10 @@ import {
   getRandomBirdPosition,
 } from './gameLogic.js';
 import {
+  isLowBatteryTime,
+  countdownBeepIndex,
+} from './lowBattery.js';
+import {
   isStandaloneDisplayMode,
   readInstallPromptDismissed,
   shouldShowInstallPrompt,
@@ -147,6 +151,8 @@ let leaderboardSubmitted = false;
 let globalHighScore = 0;
 let movingBirdsState = new Map();
 let animationFrameId = null;
+let lowBatteryActive = false;
+let lastBeepIndexPlayed = -1;
 
 // Initialize birds info
 const birdIds = ['great_horned_owl', 'western_screech_owl', 'barn_owl', 'common_poorwill'];
@@ -467,6 +473,7 @@ function startMovingBirdAnimation() {
 
     updateMovingBirds(deltaTime);
     checkMovingBirdDetection();
+    applyLowBatteryFlicker();
 
     animationFrameId = requestAnimationFrame(animate);
   };
@@ -479,6 +486,22 @@ function stopMovingBirdAnimation() {
     cancelAnimationFrame(animationFrameId);
     animationFrameId = null;
   }
+}
+
+function flickerBeamRadius() {
+  const r = Math.random();
+  if (r < 0.25) return 5 + Math.random() * 8;
+  if (r < 0.45) return 15 + Math.random() * 8;
+  if (r < 0.55) return 28 + Math.random() * 8;
+  return 40;
+}
+
+function applyLowBatteryFlicker() {
+  if (!lowBatteryActive) return;
+
+  const beamRadius = flickerBeamRadius();
+
+  darknessOverlay.style.background = `radial-gradient(circle at ${currentMouseX}px ${currentMouseY}px, transparent ${beamRadius}px, rgba(0,0,0,0.98) ${beamRadius + 20}px)`;
 }
 
 function setBirdFlyingImage(id, isFlying) {
@@ -1176,9 +1199,11 @@ function updateFlashlight(x, y, controlMode = currentControlMode) {
 
   currentMouseX = positions.spotlightX;
   currentMouseY = positions.spotlightY;
-  
+
+  const beamRadius = lowBatteryActive ? flickerBeamRadius() : 40;
+
   // Update mask
-  darknessOverlay.style.background = `radial-gradient(circle at ${positions.spotlightX}px ${positions.spotlightY}px, transparent 40px, rgba(0,0,0,0.98) 60px)`;
+  darknessOverlay.style.background = `radial-gradient(circle at ${positions.spotlightX}px ${positions.spotlightY}px, transparent ${beamRadius}px, rgba(0,0,0,0.98) ${beamRadius + 20}px)`;
   
   // Update hand position
   flashlightHand.style.left = `${positions.handX}px`;
@@ -1381,6 +1406,7 @@ function startGameLogic() {
   foundBirds.clear();
   score = 0;
   correctStreak = 0;
+  lastBeepIndexPlayed = -1;
   isPlaying = true;
   isGuessing = false;
   currentBirdTarget = null;
@@ -1468,6 +1494,9 @@ function endGame(result) {
   guessModal.classList.add('hidden');
   guessFeedback.classList.add('hidden');
   
+  stopLowBattery();
+  lastBeepIndexPlayed = -1;
+
   pauseBirdCalls();
   hideAudioTip();
   const isNewHighScore = updateHighScore();
@@ -1500,12 +1529,54 @@ function formatTime(seconds) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+function startLowBattery() {
+  if (lowBatteryActive) return;
+  lowBatteryActive = true;
+  gameContainer.classList.add('low-battery');
+}
+
+function stopLowBattery() {
+  if (!lowBatteryActive) return;
+  lowBatteryActive = false;
+  gameContainer.classList.remove('low-battery');
+}
+
+function playCountdownBeep(index) {
+  if (lastBeepIndexPlayed >= index) return;
+  lastBeepIndexPlayed = index;
+
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const oscillator = ctx.createOscillator();
+  const gainNode = ctx.createGain();
+
+  oscillator.type = 'square';
+  oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+
+  gainNode.gain.setValueAtTime(0.12, ctx.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+
+  oscillator.connect(gainNode);
+  gainNode.connect(ctx.destination);
+
+  oscillator.start(ctx.currentTime);
+  oscillator.stop(ctx.currentTime + 0.15);
+}
+
 function gameLoop() {
-  if (isGuessing) return; // Pause timer during guess
-  
+  if (isGuessing) return;
+
   timeRemaining--;
   timerEl.innerText = formatTime(timeRemaining);
-  
+
+  if (isLowBatteryTime(timeRemaining)) {
+    startLowBattery();
+    playCountdownBeep(countdownBeepIndex(timeRemaining));
+  } else if (lowBatteryActive) {
+    stopLowBattery();
+  }
+
   const status = isGameOver(timeRemaining, foundBirds.size, TOTAL_BIRDS);
   if (status !== 'playing') {
     endGame(status);

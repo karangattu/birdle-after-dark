@@ -31,6 +31,7 @@ import greatHornedOwlAudioSrc from '../assets/great_horned_owl.mp3';
 import westernScreechOwlAudioSrc from '../assets/western_screech_owl.mp3';
 import westernScreechOwlFlyingSrc from '../assets/western_screech_owl_flying.png';
 import commonPoorwillFlyingSrc from '../assets/common_poorwill_flying.png';
+import barnOwlFlyingSrc from '../assets/barn_owl_flying.png';
 
 // DOM Elements
 const startScreen = document.getElementById('start-screen');
@@ -100,8 +101,14 @@ const AUDIO_TIP_HIDE_DELAY_MS = 6500;
 const AUDIO_TIP_REMINDER_MESSAGE = 'Turn up sound for the best bird-call clues.';
 const AUDIO_TIP_BOOSTED_MESSAGE = 'Game audio is back up. Check your device volume too.';
 const AUDIO_TIP_BLOCKED_MESSAGE = 'Tap the speaker to retry audio, then check device volume.';
-const MOVING_BIRD_IDS = ['western_screech_owl', 'common_poorwill'];
 const MOVING_BIRD_SPEED = 0.12;
+
+function getMovingBirdIds() {
+  if (gameMode === 'expert') {
+    return ['western_screech_owl', 'common_poorwill'];
+  }
+  return ['barn_owl'];
+}
 const BIRD_DOM_FALLBACK_POSITIONS = [
   { top: 38, left: 0 },
   { top: 38, left: 30 },
@@ -152,6 +159,7 @@ const birdCallSources = {
 const birdFlyingSources = {
   western_screech_owl: westernScreechOwlFlyingSrc,
   common_poorwill: commonPoorwillFlyingSrc,
+  barn_owl: barnOwlFlyingSrc,
 };
 const birdCallNodes = new Map();
 
@@ -345,7 +353,7 @@ function initializeMovingBirds() {
   movingBirdsState.clear();
   const containerRect = gameContainer.getBoundingClientRect();
 
-  MOVING_BIRD_IDS.forEach(id => {
+  getMovingBirdIds().forEach(id => {
     const horizontal = Math.random() > 0.5;
     const direction = Math.random() > 0.5 ? 1 : -1;
 
@@ -375,9 +383,9 @@ function initializeMovingBirds() {
 }
 
 function updateMovingBirds(deltaTime) {
-  if (gameMode !== 'expert') return;
+  if (getMovingBirdIds().length === 0) return;
 
-  MOVING_BIRD_IDS.forEach(id => {
+  getMovingBirdIds().forEach(id => {
     const state = movingBirdsState.get(id);
     if (!state || state.isFrozen || foundBirds.has(id)) return;
 
@@ -422,11 +430,11 @@ function freezeMovingBird(id) {
 }
 
 function checkMovingBirdDetection() {
-  if (gameMode !== 'expert') return;
+  if (getMovingBirdIds().length === 0) return;
 
   const birdsInfo = getBirdsInfo();
 
-  MOVING_BIRD_IDS.forEach(id => {
+  getMovingBirdIds().forEach(id => {
     if (foundBirds.has(id)) return;
     const state = movingBirdsState.get(id);
     if (!state || state.isFrozen) return;
@@ -489,9 +497,9 @@ function setBirdFlyingImage(id, isFlying) {
 }
 
 function updateBirdImagesForMode() {
-  MOVING_BIRD_IDS.forEach(id => {
+  getMovingBirdIds().forEach(id => {
     const state = movingBirdsState.get(id);
-    if (gameMode === 'expert' && state && state.isMoving && !state.isFrozen) {
+    if (state && state.isMoving && !state.isFrozen) {
       setBirdFlyingImage(id, true);
     } else {
       setBirdFlyingImage(id, false);
@@ -716,7 +724,7 @@ function getBirdsInfo() {
 }
 
 function getMovingBirdsInfo() {
-  if (gameMode !== 'expert') {
+  if (movingBirdsState.size === 0) {
     return getBirdsInfo();
   }
 
@@ -1407,11 +1415,9 @@ function startGameLogic() {
 
   randomizeBirds();
 
-  if (gameMode === 'expert') {
+  if (getMovingBirdIds().length > 0) {
     initializeMovingBirds();
     updateBirdImagesForMode();
-  } else {
-    movingBirdsState.clear();
   }
 
   const centerPoint = getGameViewportCenter();

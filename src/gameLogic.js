@@ -330,3 +330,89 @@ export function getRandomBirdPosition(existingPositions = [], options = {}) {
     left: placementOptions.leftMin,
   };
 }
+
+export function startleMovingBirdState(state, options = {}) {
+  const continueDuration = options.continueFlyingDuration ?? 1.0;
+  const newState = { ...state };
+  if (newState.reactionState === null) {
+    newState.reactionState = 'continuing';
+    newState.reactionTimer = continueDuration;
+    newState.isMoving = true;
+    newState.isFrozen = false;
+  }
+  return newState;
+}
+
+export function updateMovingBirdState(state, deltaTime, options = {}) {
+  const speed = options.movingBirdSpeed ?? 0.12;
+  const perchDuration = options.perchDuration ?? 3.0;
+  const random = options.randomFunc ?? Math.random;
+
+  const newState = { ...state };
+
+  if (newState.isFrozen) {
+    return newState;
+  }
+
+  if (newState.reactionState === 'continuing') {
+    newState.reactionTimer -= deltaTime;
+    if (newState.reactionTimer <= 0) {
+      newState.reactionState = 'perched';
+      newState.reactionTimer = perchDuration;
+      newState.isMoving = false;
+    }
+  } else if (newState.reactionState === 'perched') {
+    newState.reactionTimer -= deltaTime;
+    if (newState.reactionTimer <= 0) {
+      newState.reactionState = 'backAndForth';
+      newState.isMoving = true;
+    }
+  }
+
+  if (!newState.isMoving) {
+    return newState;
+  }
+
+  newState.xPercent += newState.velocityXPercent * deltaTime;
+  newState.yPercent += newState.velocityYPercent * deltaTime;
+
+  if (newState.reactionState === 'backAndForth') {
+    if (newState.xPercent < 0) {
+      newState.xPercent = 0;
+      newState.velocityXPercent = -newState.velocityXPercent;
+    } else if (newState.xPercent > 100) {
+      newState.xPercent = 100;
+      newState.velocityXPercent = -newState.velocityXPercent;
+    }
+
+    if (newState.yPercent < 0) {
+      newState.yPercent = 0;
+      newState.velocityYPercent = -newState.velocityYPercent;
+    } else if (newState.yPercent > 100) {
+      newState.yPercent = 100;
+      newState.velocityYPercent = -newState.velocityYPercent;
+    }
+  } else {
+    if (newState.xPercent < -15 || newState.xPercent > 115 || newState.yPercent < -15 || newState.yPercent > 115) {
+      const horizontal = Math.abs(newState.velocityXPercent) > Math.abs(newState.velocityYPercent);
+      const direction = horizontal
+        ? (newState.velocityXPercent > 0 ? -1 : 1)
+        : (newState.velocityYPercent > 0 ? -1 : 1);
+
+      if (horizontal) {
+        newState.xPercent = direction > 0 ? -5 : 105;
+        newState.yPercent = 25 + random() * 45;
+        newState.velocityXPercent = direction * speed * 100;
+        newState.velocityYPercent = (random() - 0.5) * 3;
+      } else {
+        newState.xPercent = 20 + random() * 60;
+        newState.yPercent = direction > 0 ? -5 : 105;
+        newState.velocityXPercent = (random() - 0.5) * 4;
+        newState.velocityYPercent = direction * speed * 100;
+      }
+    }
+  }
+
+  return newState;
+}
+

@@ -10,7 +10,10 @@ import {
   isGameOver,
   isTapInteraction,
   getRandomBirdPosition,
+  startleMovingBirdState,
+  updateMovingBirdState,
 } from '../src/gameLogic';
+
 
 describe('gameLogic', () => {
   describe('checkBirdFound', () => {
@@ -240,4 +243,104 @@ describe('gameLogic', () => {
       }
     });
   });
+
+  describe('startleMovingBirdState', () => {
+    it('should transition to continuing when reactionState is null', () => {
+      const state = { reactionState: null, isMoving: true, isFrozen: false };
+      const next = startleMovingBirdState(state, { continueFlyingDuration: 1.5 });
+      expect(next.reactionState).toBe('continuing');
+      expect(next.reactionTimer).toBe(1.5);
+      expect(next.isMoving).toBe(true);
+      expect(next.isFrozen).toBe(false);
+    });
+
+    it('should not transition if already in a reaction state', () => {
+      const state = { reactionState: 'perched', reactionTimer: 3.0, isMoving: false, isFrozen: false };
+      const next = startleMovingBirdState(state);
+      expect(next.reactionState).toBe('perched');
+      expect(next.reactionTimer).toBe(3.0);
+    });
+  });
+
+  describe('updateMovingBirdState', () => {
+    it('should decrement timer and transition from continuing to perched', () => {
+      const state = {
+        reactionState: 'continuing',
+        reactionTimer: 0.5,
+        isMoving: true,
+        isFrozen: false,
+        xPercent: 50,
+        yPercent: 50,
+        velocityXPercent: 10,
+        velocityYPercent: 0,
+      };
+      const next = updateMovingBirdState(state, 1.0, { perchDuration: 2.5 });
+      expect(next.reactionState).toBe('perched');
+      expect(next.reactionTimer).toBe(2.5);
+      expect(next.isMoving).toBe(false);
+    });
+
+    it('should decrement timer and transition from perched to backAndForth', () => {
+      const state = {
+        reactionState: 'perched',
+        reactionTimer: 0.5,
+        isMoving: false,
+        isFrozen: false,
+        xPercent: 50,
+        yPercent: 50,
+        velocityXPercent: 10,
+        velocityYPercent: 0,
+      };
+      const next = updateMovingBirdState(state, 1.0);
+      expect(next.reactionState).toBe('backAndForth');
+      expect(next.isMoving).toBe(true);
+    });
+
+    it('should bounce off boundaries in backAndForth state', () => {
+      const stateLeft = {
+        reactionState: 'backAndForth',
+        isMoving: true,
+        isFrozen: false,
+        xPercent: -5,
+        yPercent: 50,
+        velocityXPercent: -10,
+        velocityYPercent: 0,
+      };
+      const nextLeft = updateMovingBirdState(stateLeft, 0.1);
+      expect(nextLeft.xPercent).toBe(0);
+      expect(nextLeft.velocityXPercent).toBe(10);
+
+      const stateRight = {
+        reactionState: 'backAndForth',
+        isMoving: true,
+        isFrozen: false,
+        xPercent: 105,
+        yPercent: 50,
+        velocityXPercent: 10,
+        velocityYPercent: 0,
+      };
+      const nextRight = updateMovingBirdState(stateRight, 0.1);
+      expect(nextRight.xPercent).toBe(100);
+      expect(nextRight.velocityXPercent).toBe(-10);
+    });
+
+    it('should wrap around in normal state', () => {
+      const state = {
+        reactionState: null,
+        isMoving: true,
+        isFrozen: false,
+        xPercent: 120,
+        yPercent: 50,
+        velocityXPercent: 10,
+        velocityYPercent: 0,
+      };
+      const next = updateMovingBirdState(state, 0.1, {
+        movingBirdSpeed: 0.12,
+        randomFunc: () => 0.5,
+      });
+      expect(next.xPercent).toBe(105);
+      expect(next.yPercent).toBe(47.5);
+    });
+  });
 });
+

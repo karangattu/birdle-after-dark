@@ -9,6 +9,8 @@ import {
   isTapInteraction,
   isGameOver,
   getRandomBirdPosition,
+  updateMovingBirdState,
+  startleMovingBirdState,
 } from './gameLogic.js';
 import {
   isLowBatteryTime,
@@ -384,6 +386,8 @@ function initializeMovingBirds() {
       velocityYPercent: (velocityY / containerRect.height) * 100,
       isMoving: true,
       isFrozen: false,
+      reactionState: null,
+      reactionTimer: 0,
     });
   });
 }
@@ -392,45 +396,32 @@ function updateMovingBirds(deltaTime) {
   if (getMovingBirdIds().length === 0) return;
 
   getMovingBirdIds().forEach(id => {
-    const state = movingBirdsState.get(id);
-    if (!state || state.isFrozen || foundBirds.has(id)) return;
+    let state = movingBirdsState.get(id);
+    if (!state || foundBirds.has(id)) return;
 
-    state.xPercent += state.velocityXPercent * deltaTime;
-    state.yPercent += state.velocityYPercent * deltaTime;
+    const nextState = updateMovingBirdState(state, deltaTime, {
+      movingBirdSpeed: MOVING_BIRD_SPEED,
+    });
+    movingBirdsState.set(id, nextState);
+    state = nextState;
 
     const el = document.getElementById(id);
     el.style.left = `${state.xPercent}%`;
     el.style.top = `${state.yPercent}%`;
 
-    if (state.xPercent < -15 || state.xPercent > 115 || state.yPercent < -15 || state.yPercent > 115) {
-      const horizontal = Math.abs(state.velocityXPercent) > Math.abs(state.velocityYPercent);
-      const direction = horizontal
-        ? (state.velocityXPercent > 0 ? -1 : 1)
-        : (state.velocityYPercent > 0 ? -1 : 1);
-
-      if (horizontal) {
-        state.xPercent = direction > 0 ? -5 : 105;
-        state.yPercent = 25 + Math.random() * 45;
-        state.velocityXPercent = direction * MOVING_BIRD_SPEED * 100;
-        state.velocityYPercent = (Math.random() - 0.5) * 3;
-      } else {
-        state.xPercent = 20 + Math.random() * 60;
-        state.yPercent = direction > 0 ? -5 : 105;
-        state.velocityXPercent = (Math.random() - 0.5) * 4;
-        state.velocityYPercent = direction * MOVING_BIRD_SPEED * 100;
-      }
+    if (birdFlyingSources[id]) {
+      setBirdFlyingImage(id, state.isMoving);
     }
   });
 }
 
-function freezeMovingBird(id) {
+function startleMovingBird(id) {
   const state = movingBirdsState.get(id);
-  if (state && state.isMoving && !state.isFrozen) {
-    state.isFrozen = true;
-    state.isMoving = false;
-    const el = document.getElementById(id);
+  if (state && state.reactionState === null) {
+    const nextState = startleMovingBirdState(state);
+    movingBirdsState.set(id, nextState);
     if (birdFlyingSources[id]) {
-      el.src = el.src.replace('_flying.png', '.png');
+      setBirdFlyingImage(id, nextState.isMoving);
     }
   }
 }
@@ -445,6 +436,8 @@ function checkMovingBirdDetection() {
     const state = movingBirdsState.get(id);
     if (!state || state.isFrozen) return;
 
+    if (state.reactionState !== null) return;
+
     const birdInfo = birdsInfo.find(b => b.id === id);
     if (!birdInfo) return;
 
@@ -453,7 +446,7 @@ function checkMovingBirdDetection() {
     const distanceSquared = dx * dx + dy * dy;
 
     if (distanceSquared <= FLASHLIGHT_RADIUS * FLASHLIGHT_RADIUS) {
-      freezeMovingBird(id);
+      startleMovingBird(id);
     }
   });
 }

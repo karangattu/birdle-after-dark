@@ -86,6 +86,7 @@ const leaderboardNameForm = document.getElementById('leaderboard-name-form');
 const leaderboardNameInput = document.getElementById('leaderboard-name-input');
 const leaderboardSubmitBtn = document.getElementById('leaderboard-submit-btn');
 const leaderboardNameFeedback = document.getElementById('leaderboard-name-feedback');
+const homeBtn = document.getElementById('home-btn');
 
 const GAME_DURATION_REGULAR = 60;
 const GAME_DURATION_EXPERT = 40;
@@ -1789,6 +1790,13 @@ audioTipButton.addEventListener('click', handleAudioTipButtonClick);
 installPromptInstallBtn?.addEventListener('click', promptInstallApp);
 installPromptDismissBtn?.addEventListener('click', dismissInstallPrompt);
 leaderboardSubmitBtn.addEventListener('click', handleScoreSubmission);
+homeBtn.addEventListener('click', () => {
+  resetLeaderboardState();
+  endScreen.classList.remove('active');
+  startScreen.classList.add('active');
+  playOpeningAudio();
+  loadGlobalHighScore();
+});
 leaderboardNameInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') handleScoreSubmission();
 });

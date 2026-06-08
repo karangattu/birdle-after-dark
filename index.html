@@ -75,23 +75,28 @@
     <!-- Tutorial Modal -->
     <div id="tutorial-modal" class="tutorial-modal hidden" role="dialog" aria-modal="true" aria-labelledby="tutorial-title">
       <div class="tutorial-content">
-        <p class="tutorial-kicker">Field Briefing</p>
-        <h2 id="tutorial-title">Night Search Protocol</h2>
+        <div class="tutorial-header-row">
+          <img src="/assets/tutorial_owl.png" alt="Cute scout owl" class="tutorial-owl-graphic" />
+          <div class="tutorial-header-text">
+            <p class="tutorial-kicker">Field Briefing</p>
+            <h2 id="tutorial-title">Night Spotter Protocol</h2>
+          </div>
+        </div>
         <div class="tutorial-steps">
           <div class="tutorial-step">
             <span>1</span>
-            <p>Move the beam until a bird is clearly inside the light.</p>
+            <p><strong>Sweep the Dark!</strong> Gently move your flashlight through the trees. Listen for faint calls to find hidden feathered targets.</p>
           </div>
           <div class="tutorial-step">
             <span>2</span>
-            <p>Click the lit sighting, or use Identify when the panel appears.</p>
+            <p><strong>Target Locked!</strong> When a bird is caught inside your beam, hold steady and click the <strong>Identify</strong> button on your panel.</p>
           </div>
           <div class="tutorial-step">
             <span>3</span>
-            <p>Pick the species carefully. A wrong call costs 5 seconds.</p>
+            <p><strong>Watch the clock!</strong> Correctly guess the species to gain bonus points. Be careful: a wrong call startles the bird and costs you <strong>5 seconds</strong>!</p>
           </div>
         </div>
-        <button id="tutorial-start-btn" class="primary-btn" type="button">Start Hunt</button>
+        <button id="tutorial-start-btn" class="primary-btn" type="button">Begin Patrol</button>
       </div>
     </div>
 
@@ -218,7 +223,10 @@
             </div>
           </div>
         </div>
-        <button id="restart-btn" class="primary-btn">Play Again</button>
+        <div class="end-actions">
+          <button id="restart-btn" class="primary-btn">Play Again</button>
+          <button id="home-btn" class="secondary-btn">Home</button>
+        </div>
       </div>
     </div>
 

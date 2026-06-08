@@ -1036,6 +1036,66 @@ p {
   color: #fff;
 }
 
+.tutorial-header-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.tutorial-owl-graphic {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2px solid var(--primary-color);
+  box-shadow: 0 0 12px rgba(255, 204, 0, 0.4);
+  object-fit: cover;
+}
+
+.tutorial-header-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.tutorial-header-text h2 {
+  margin: 0;
+  font-size: clamp(1.4rem, 3.6vw, 1.9rem) !important;
+}
+
+.tutorial-header-text .tutorial-kicker {
+  margin-bottom: 4px;
+}
+
+.end-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.secondary-btn {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 15px 40px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: transform 0.2s, background-color 0.2s, border-color 0.2s;
+}
+
+.secondary-btn:hover {
+  transform: scale(1.05);
+  background-color: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.secondary-btn:active {
+  transform: scale(0.98);
+}
+
+
 
 @keyframes streak-pop {
   0% {

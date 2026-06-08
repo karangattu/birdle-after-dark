@@ -20,3 +20,6 @@ CREATE POLICY "Allow public insert" ON public.after_dark_leaderboard
 
 CREATE INDEX IF NOT EXISTS idx_after_dark_leaderboard_score ON public.after_dark_leaderboard (score DESC);
 CREATE INDEX IF NOT EXISTS idx_after_dark_leaderboard_mode_score ON public.after_dark_leaderboard (game_mode, score DESC);
+
+-- Enable realtime subscriptions for this table (Run in Supabase database SQL Editor)
+-- alter publication supabase_realtime add table public.after_dark_leaderboard;

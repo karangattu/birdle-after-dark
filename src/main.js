@@ -1793,6 +1793,27 @@ leaderboardNameInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') handleScoreSubmission();
 });
 
+document.querySelectorAll('#onscreen-keyboard .key').forEach(key => {
+  key.addEventListener('click', (e) => {
+    e.preventDefault();
+    const currentName = leaderboardNameInput.value;
+    const keyText = e.currentTarget.innerText;
+
+    if (e.currentTarget.classList.contains('backspace-key')) {
+      leaderboardNameInput.value = currentName.slice(0, -1);
+    } else if (e.currentTarget.classList.contains('space-key')) {
+      if (currentName.length < 20) {
+        leaderboardNameInput.value = currentName + ' ';
+      }
+    } else {
+      if (currentName.length < 20) {
+        leaderboardNameInput.value = currentName + keyText;
+      }
+    }
+  });
+});
+
+
 gameContainer.addEventListener('pointerdown', handlePointerDown);
 gameContainer.addEventListener('pointermove', handlePointerMove);
 gameContainer.addEventListener('pointerup', handlePointerUp);

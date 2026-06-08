@@ -1095,6 +1095,38 @@ p {
   transform: scale(0.98);
 }
 
+#video-screen {
+  position: relative;
+}
+
+.skip-btn {
+  position: absolute;
+  bottom: 24px;
+  right: max(24px, env(safe-area-inset-right));
+  z-index: 10;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  color: #fff;
+  padding: 10px 24px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  backdrop-filter: blur(5px);
+  transition: background 0.2s, transform 0.2s, border-color 0.2s;
+}
+
+.skip-btn:hover {
+  background: rgba(255, 204, 0, 0.16);
+  border-color: rgba(255, 204, 0, 0.6);
+  transform: scale(1.05);
+}
+
+.skip-btn:active {
+  transform: scale(0.98);
+}
+
+
 
 
 @keyframes streak-pop {

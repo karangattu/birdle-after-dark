@@ -62,6 +62,7 @@ const endMessage = document.getElementById('end-message');
 const endScoreSummary = document.getElementById('end-score-summary');
 const videoScreen = document.getElementById('video-screen');
 const transitionVideo = document.getElementById('transition-video');
+const skipVideoBtn = document.getElementById('skip-video-btn');
 const tutorialModal = document.getElementById('tutorial-modal');
 const tutorialStartBtn = document.getElementById('tutorial-start-btn');
 const audioTip = document.getElementById('audio-tip');
@@ -1784,6 +1785,10 @@ updateScoreboard();
 
 startBtn.addEventListener('click', startGame);
 restartBtn.addEventListener('click', startGame);
+skipVideoBtn.addEventListener('click', () => {
+  transitionVideo.pause();
+  showTutorial();
+});
 tutorialStartBtn.addEventListener('click', startGameLogic);
 identifyBtn.addEventListener('click', handleRegister);
 audioTipButton.addEventListener('click', handleAudioTipButtonClick);

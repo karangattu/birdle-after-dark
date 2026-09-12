@@ -7,6 +7,7 @@ import {
   getBirdCandidateInBeam,
   getFlashlightPositions,
   getStreakFeedback,
+  isBirdStartlable,
   isGameOver,
   isTapInteraction,
   getRandomBirdPosition,
@@ -303,6 +304,43 @@ describe('gameLogic', () => {
       expect(next.reactionState).toBe('perched');
       expect(next.reactionTimer).toBe(3.0);
     });
+
+    it('should not startle a backAndForth bird while its cooldown is active', () => {
+      const state = { reactionState: 'backAndForth', isMoving: true, isFrozen: false, startleCooldown: 4.5 };
+      const next = startleMovingBirdState(state);
+      expect(next.reactionState).toBe('backAndForth');
+      expect(next.isMoving).toBe(true);
+    });
+
+    it('should startle a backAndForth bird once its cooldown has expired', () => {
+      const state = { reactionState: 'backAndForth', isMoving: true, isFrozen: false, startleCooldown: 0 };
+      const next = startleMovingBirdState(state, { continueFlyingDuration: 1.0 });
+      expect(next.reactionState).toBe('continuing');
+      expect(next.reactionTimer).toBe(1.0);
+      expect(next.isMoving).toBe(true);
+    });
+  });
+
+  describe('isBirdStartlable', () => {
+    it('should be startlable in normal flight', () => {
+      expect(isBirdStartlable({ reactionState: null, isFrozen: false })).toBe(true);
+    });
+
+    it('should not be startlable while continuing or perched', () => {
+      expect(isBirdStartlable({ reactionState: 'continuing', isFrozen: false })).toBe(false);
+      expect(isBirdStartlable({ reactionState: 'perched', isFrozen: false })).toBe(false);
+    });
+
+    it('should not be startlable in backAndForth until the cooldown expires', () => {
+      expect(isBirdStartlable({ reactionState: 'backAndForth', isFrozen: false, startleCooldown: 7 })).toBe(false);
+      expect(isBirdStartlable({ reactionState: 'backAndForth', isFrozen: false, startleCooldown: 0.01 })).toBe(false);
+      expect(isBirdStartlable({ reactionState: 'backAndForth', isFrozen: false, startleCooldown: 0 })).toBe(true);
+    });
+
+    it('should never be startlable while frozen', () => {
+      expect(isBirdStartlable({ reactionState: null, isFrozen: true })).toBe(false);
+      expect(isBirdStartlable({ reactionState: 'backAndForth', isFrozen: true, startleCooldown: 0 })).toBe(false);
+    });
   });
 
   describe('updateMovingBirdState', () => {
@@ -418,6 +456,76 @@ describe('gameLogic', () => {
         state = updateMovingBirdState(state, 0.2, { horizontalOnly: true });
         expect(state.yPercent).toBe(30);
       }
+    });
+
+    it('should arm a 7 second startle cooldown when leaving the perch', () => {
+      const state = {
+        reactionState: 'perched',
+        reactionTimer: 0.5,
+        isMoving: false,
+        isFrozen: false,
+        xPercent: 50,
+        yPercent: 30,
+        velocityXPercent: 10,
+        velocityYPercent: 0,
+      };
+      const next = updateMovingBirdState(state, 1.0);
+      expect(next.reactionState).toBe('backAndForth');
+      expect(next.isMoving).toBe(true);
+      expect(next.startleCooldown).toBe(7.0);
+    });
+
+    it('should count the startle cooldown down while flying back and forth', () => {
+      const state = {
+        reactionState: 'backAndForth',
+        isMoving: true,
+        isFrozen: false,
+        xPercent: 50,
+        yPercent: 30,
+        velocityXPercent: 10,
+        velocityYPercent: 0,
+        startleCooldown: 7.0,
+      };
+      const next = updateMovingBirdState(state, 2.5);
+      expect(next.startleCooldown).toBeCloseTo(4.5);
+      expect(next.reactionState).toBe('backAndForth');
+      expect(next.isMoving).toBe(true);
+    });
+
+    it('should run the full startle, perch, cooldown, and re-perch cycle', () => {
+      let state = {
+        reactionState: null,
+        isMoving: true,
+        isFrozen: false,
+        xPercent: 50,
+        yPercent: 30,
+        velocityXPercent: 10,
+        velocityYPercent: 0,
+        startleCooldown: 0,
+      };
+
+      state = startleMovingBirdState(state, { continueFlyingDuration: 1.0 });
+      expect(state.reactionState).toBe('continuing');
+
+      state = updateMovingBirdState(state, 1.0);
+      expect(state.reactionState).toBe('perched');
+      expect(state.isMoving).toBe(false);
+
+      state = updateMovingBirdState(state, 3.0);
+      expect(state.reactionState).toBe('backAndForth');
+      expect(isBirdStartlable(state)).toBe(false);
+
+      // Tracking the beam during the cooldown must not re-perch the bird.
+      expect(startleMovingBirdState(state).reactionState).toBe('backAndForth');
+
+      state = updateMovingBirdState(state, 6.9);
+      expect(isBirdStartlable(state)).toBe(false);
+
+      state = updateMovingBirdState(state, 0.1);
+      expect(isBirdStartlable(state)).toBe(true);
+
+      state = startleMovingBirdState(state, { continueFlyingDuration: 1.0 });
+      expect(state.reactionState).toBe('continuing');
     });
   });
 });

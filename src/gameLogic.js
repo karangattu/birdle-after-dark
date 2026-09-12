@@ -358,18 +358,36 @@ export function getRandomBirdPosition(existingPositions = [], options = {}) {
 export function startleMovingBirdState(state, options = {}) {
   const continueDuration = options.continueFlyingDuration ?? 1.0;
   const newState = { ...state };
-  if (newState.reactionState === null) {
+  const cooldown = newState.startleCooldown ?? 0;
+  const canStartle = newState.reactionState === null
+    || (newState.reactionState === 'backAndForth' && cooldown <= 0);
+  if (canStartle) {
     newState.reactionState = 'continuing';
     newState.reactionTimer = continueDuration;
     newState.isMoving = true;
     newState.isFrozen = false;
+    newState.startleCooldown = 0;
   }
   return newState;
+}
+
+export function isBirdStartlable(state) {
+  if (!state || state.isFrozen) {
+    return false;
+  }
+
+  if (state.reactionState === null) {
+    return true;
+  }
+
+  return state.reactionState === 'backAndForth'
+    && (state.startleCooldown ?? 0) <= 0;
 }
 
 export function updateMovingBirdState(state, deltaTime, options = {}) {
   const speed = options.movingBirdSpeed ?? 0.12;
   const perchDuration = options.perchDuration ?? 3.0;
+  const startleCooldownDuration = options.startleCooldownDuration ?? 7.0;
   const random = options.randomFunc ?? Math.random;
   const horizontalOnly = options.horizontalOnly ?? false;
 
@@ -391,7 +409,13 @@ export function updateMovingBirdState(state, deltaTime, options = {}) {
     if (newState.reactionTimer <= 0) {
       newState.reactionState = 'backAndForth';
       newState.isMoving = true;
+      newState.startleCooldown = startleCooldownDuration;
     }
+  } else if (newState.reactionState === 'backAndForth') {
+    newState.startleCooldown = Math.max(
+      0,
+      (newState.startleCooldown ?? 0) - deltaTime,
+    );
   }
 
   if (!newState.isMoving) {

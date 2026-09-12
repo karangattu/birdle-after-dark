@@ -6,6 +6,7 @@ import {
   getEndGamePresentation,
   getFlashlightPositions,
   getStreakFeedback,
+  isBirdStartlable,
   isTapInteraction,
   isGameOver,
   getRandomBirdPosition,
@@ -410,6 +411,7 @@ function initializeMovingBirds() {
       isFrozen: false,
       reactionState: null,
       reactionTimer: 0,
+      startleCooldown: 0,
     });
   });
 }
@@ -442,7 +444,7 @@ function updateMovingBirds(deltaTime) {
 
 function startleMovingBird(id) {
   const state = movingBirdsState.get(id);
-  if (state && state.reactionState === null) {
+  if (state && isBirdStartlable(state)) {
     const nextState = startleMovingBirdState(state);
     movingBirdsState.set(id, nextState);
     if (birdSpriteSheets[id]) {
@@ -461,7 +463,7 @@ function checkMovingBirdDetection() {
     const state = movingBirdsState.get(id);
     if (!state || state.isFrozen) return;
 
-    if (state.reactionState !== null) return;
+    if (!isBirdStartlable(state)) return;
 
     const birdInfo = birdsInfo.find(b => b.id === id);
     if (!birdInfo) return;

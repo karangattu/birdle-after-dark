@@ -35,8 +35,10 @@ import commonPoorwillAudioSrc from '../assets/common_poorwill.mp3';
 import gameStartAudioSrc from '../assets/game_start_audio.mp3';
 import greatHornedOwlAudioSrc from '../assets/great_horned_owl.mp3';
 import westernScreechOwlAudioSrc from '../assets/western_screech_owl.mp3';
-import westernScreechOwlFlyingSrc from '../assets/western_screech_owl_flying.png';
-import commonPoorwillFlyingSrc from '../assets/common_poorwill_flying.png';
+import westernScreechOwlRestingSrc from '../assets/western_screech_owl.png';
+import westernScreechOwlSpriteSheetSrc from '../assets/western_screech_owl_sprite_sheet.png';
+import commonPoorwillRestingSrc from '../assets/common_poorwill.png';
+import commonPoorwillSpriteSheetSrc from '../assets/common_poorwill_sprite_sheet.png';
 import barnOwlRestingSrc from '../assets/barn_owl.png';
 import barnOwlSpriteSheetSrc from '../assets/barn_owl_sprite_sheet.png';
 
@@ -115,7 +117,7 @@ const AUDIO_TIP_BOOSTED_MESSAGE = 'Game audio is back up. Check your device volu
 const AUDIO_TIP_BLOCKED_MESSAGE = 'Tap the speaker to retry audio, then check device volume.';
 const MOVING_BIRD_SPEED = 0.12;
 const TRANSPARENT_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-const HORIZONTAL_ONLY_BIRDS = new Set(['barn_owl']);
+const HORIZONTAL_ONLY_BIRDS = new Set(['barn_owl', 'western_screech_owl', 'common_poorwill']);
 
 function getMovingBirdIds() {
   if (gameMode === 'expert') {
@@ -172,14 +174,18 @@ const birdCallSources = {
   barn_owl: barnOwlAudioSrc,
   common_poorwill: commonPoorwillAudioSrc,
 };
-const birdFlyingSources = {
-  western_screech_owl: westernScreechOwlFlyingSrc,
-  common_poorwill: commonPoorwillFlyingSrc,
-};
 const birdSpriteSheets = {
   barn_owl: {
     src: barnOwlSpriteSheetSrc,
     restingSrc: barnOwlRestingSrc,
+  },
+  western_screech_owl: {
+    src: westernScreechOwlSpriteSheetSrc,
+    restingSrc: westernScreechOwlRestingSrc,
+  },
+  common_poorwill: {
+    src: commonPoorwillSpriteSheetSrc,
+    restingSrc: commonPoorwillRestingSrc,
   },
 };
 const birdCallNodes = new Map();
@@ -428,7 +434,7 @@ function updateMovingBirds(deltaTime) {
 
     updateBirdFacing(id, state.velocityXPercent);
 
-    if (birdFlyingSources[id] || birdSpriteSheets[id]) {
+    if (birdSpriteSheets[id]) {
       setBirdFlyingImage(id, state.isMoving);
     }
   });
@@ -439,7 +445,7 @@ function startleMovingBird(id) {
   if (state && state.reactionState === null) {
     const nextState = startleMovingBirdState(state);
     movingBirdsState.set(id, nextState);
-    if (birdFlyingSources[id] || birdSpriteSheets[id]) {
+    if (birdSpriteSheets[id]) {
       setBirdFlyingImage(id, nextState.isMoving);
     }
   }
@@ -517,28 +523,11 @@ function applyLowBatteryFlicker() {
 }
 
 function setBirdFlyingImage(id, isFlying) {
-  const el = document.getElementById(id);
-
-  if (birdSpriteSheets[id]) {
-    setBirdSpriteImage(id, el, isFlying);
-    return;
-  }
-
-  if (!birdFlyingSources[id]) return;
-
-  if (isFlying) {
-    if (!el.src.includes('_flying.png')) {
-      el.src = birdFlyingSources[id];
-    }
-  } else {
-    if (el.src.includes('_flying.png')) {
-      el.src = birdFlyingSources[id].replace('_flying.png', '.png');
-    }
-  }
-}
-
-function setBirdSpriteImage(id, el, isFlying) {
   const sprite = birdSpriteSheets[id];
+
+  if (!sprite) return;
+
+  const el = document.getElementById(id);
   const spriteState = isFlying ? 'flying' : 'resting';
 
   if (el.dataset.spriteState === spriteState) {

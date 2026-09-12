@@ -536,26 +536,32 @@ p {
 
 /* Initial widths - coordinates set via JS */
 #great_horned_owl { width: 120px; }
-#western_screech_owl { width: 90px; }
-#barn_owl {
-  --barn-owl-frame-width: 110px;
-  width: var(--barn-owl-frame-width);
+#western_screech_owl {
+  --sprite-frame-width: 90px;
+  width: var(--sprite-frame-width);
 }
-#common_poorwill { width: 80px; }
+#barn_owl {
+  --sprite-frame-width: 110px;
+  width: var(--sprite-frame-width);
+}
+#common_poorwill {
+  --sprite-frame-width: 80px;
+  width: var(--sprite-frame-width);
+}
 
-/* Barn owl flight sprite sheet (6 frames, each frame is 2x taller than wide) */
-#barn_owl.bird-sprite-flying {
-  height: calc(var(--barn-owl-frame-width) * 2);
-  width: var(--barn-owl-frame-width);
+/* Owl flight sprite sheets (6 frames, each frame is 2x taller than wide) */
+.bird-sprite-flying {
+  height: calc(var(--sprite-frame-width) * 2);
+  width: var(--sprite-frame-width);
   background-repeat: no-repeat;
   background-position: 0 0;
-  background-size: calc(var(--barn-owl-frame-width) * 6) calc(var(--barn-owl-frame-width) * 2);
-  animation: barn-owl-flap 0.72s steps(6) infinite;
+  background-size: calc(var(--sprite-frame-width) * 6) calc(var(--sprite-frame-width) * 2);
+  animation: bird-sprite-flap 0.72s steps(6) infinite;
 }
 
-@keyframes barn-owl-flap {
+@keyframes bird-sprite-flap {
   from { background-position-x: 0; }
-  to { background-position-x: calc(var(--barn-owl-frame-width) * -6); }
+  to { background-position-x: calc(var(--sprite-frame-width) * -6); }
 }
 
 .bird.found {
@@ -1374,9 +1380,9 @@ p {
   }
 
   #great_horned_owl { width: 104px; }
-  #western_screech_owl { width: 78px; }
-  #barn_owl { --barn-owl-frame-width: 96px; }
-  #common_poorwill { width: 70px; }
+  #western_screech_owl { --sprite-frame-width: 78px; }
+  #barn_owl { --sprite-frame-width: 96px; }
+  #common_poorwill { --sprite-frame-width: 70px; }
 
   #timer {
     font-size: 2rem;

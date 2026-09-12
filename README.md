@@ -2,6 +2,8 @@
 
 A small owl-themed browser game.
 
+![Birdle After Dark](assets/game_readme_poster.png)
+
 ## Run locally
 
 1. `npm install`

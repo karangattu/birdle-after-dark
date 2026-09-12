@@ -65,6 +65,9 @@ const transitionVideo = document.getElementById('transition-video');
 const skipVideoBtn = document.getElementById('skip-video-btn');
 const tutorialModal = document.getElementById('tutorial-modal');
 const tutorialStartBtn = document.getElementById('tutorial-start-btn');
+const fieldGuideBtn = document.getElementById('field-guide-btn');
+const fieldGuideModal = document.getElementById('field-guide-modal');
+const fieldGuideCloseBtn = document.getElementById('field-guide-close-btn');
 const audioTip = document.getElementById('audio-tip');
 const audioTipButton = document.getElementById('audio-tip-button');
 const audioTipText = document.getElementById('audio-tip-text');
@@ -1790,6 +1793,23 @@ skipVideoBtn.addEventListener('click', () => {
   showTutorial();
 });
 tutorialStartBtn.addEventListener('click', startGameLogic);
+fieldGuideBtn.addEventListener('click', () => {
+  fieldGuideModal.classList.remove('hidden');
+  fieldGuideCloseBtn.focus();
+});
+fieldGuideCloseBtn.addEventListener('click', () => {
+  fieldGuideModal.classList.add('hidden');
+});
+fieldGuideModal.addEventListener('click', (event) => {
+  if (event.target === fieldGuideModal) {
+    fieldGuideModal.classList.add('hidden');
+  }
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !fieldGuideModal.classList.contains('hidden')) {
+    fieldGuideModal.classList.add('hidden');
+  }
+});
 identifyBtn.addEventListener('click', handleRegister);
 audioTipButton.addEventListener('click', handleAudioTipButtonClick);
 installPromptInstallBtn?.addEventListener('click', promptInstallApp);

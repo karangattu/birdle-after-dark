@@ -367,6 +367,7 @@ export function updateMovingBirdState(state, deltaTime, options = {}) {
   const speed = options.movingBirdSpeed ?? 0.12;
   const perchDuration = options.perchDuration ?? 3.0;
   const random = options.randomFunc ?? Math.random;
+  const horizontalOnly = options.horizontalOnly ?? false;
 
   const newState = { ...state };
 
@@ -394,9 +395,14 @@ export function updateMovingBirdState(state, deltaTime, options = {}) {
   }
 
   newState.xPercent += newState.velocityXPercent * deltaTime;
-  newState.yPercent += newState.velocityYPercent * deltaTime;
 
-  if (newState.reactionState === 'backAndForth') {
+  if (horizontalOnly) {
+    newState.velocityYPercent = 0;
+  } else {
+    newState.yPercent += newState.velocityYPercent * deltaTime;
+  }
+
+  if (newState.reactionState === 'backAndForth' || horizontalOnly) {
     if (newState.xPercent < 0) {
       newState.xPercent = 0;
       newState.velocityXPercent = -newState.velocityXPercent;
@@ -405,12 +411,14 @@ export function updateMovingBirdState(state, deltaTime, options = {}) {
       newState.velocityXPercent = -newState.velocityXPercent;
     }
 
-    if (newState.yPercent < 0) {
-      newState.yPercent = 0;
-      newState.velocityYPercent = -newState.velocityYPercent;
-    } else if (newState.yPercent > 100) {
-      newState.yPercent = 100;
-      newState.velocityYPercent = -newState.velocityYPercent;
+    if (!horizontalOnly) {
+      if (newState.yPercent < 0) {
+        newState.yPercent = 0;
+        newState.velocityYPercent = -newState.velocityYPercent;
+      } else if (newState.yPercent > 100) {
+        newState.yPercent = 100;
+        newState.velocityYPercent = -newState.velocityYPercent;
+      }
     }
   } else {
     if (newState.xPercent < -15 || newState.xPercent > 115 || newState.yPercent < -15 || newState.yPercent > 115) {

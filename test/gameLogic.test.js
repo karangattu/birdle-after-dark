@@ -384,6 +384,41 @@ describe('gameLogic', () => {
       expect(next.xPercent).toBe(105);
       expect(next.yPercent).toBe(47.5);
     });
+
+    it('should keep a horizontal-only bird on its row and bounce off the edges', () => {
+      const state = {
+        reactionState: null,
+        isMoving: true,
+        isFrozen: false,
+        xPercent: 99,
+        yPercent: 40,
+        velocityXPercent: 10,
+        velocityYPercent: 25,
+      };
+      const next = updateMovingBirdState(state, 0.5, { horizontalOnly: true });
+
+      expect(next.yPercent).toBe(40);
+      expect(next.velocityYPercent).toBe(0);
+      expect(next.xPercent).toBe(100);
+      expect(next.velocityXPercent).toBe(-10);
+    });
+
+    it('should never drift vertically for a horizontal-only bird', () => {
+      let state = {
+        reactionState: 'backAndForth',
+        isMoving: true,
+        isFrozen: false,
+        xPercent: 50,
+        yPercent: 30,
+        velocityXPercent: 10,
+        velocityYPercent: 25,
+      };
+
+      for (let i = 0; i < 50; i++) {
+        state = updateMovingBirdState(state, 0.2, { horizontalOnly: true });
+        expect(state.yPercent).toBe(30);
+      }
+    });
   });
 });
 

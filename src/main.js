@@ -37,7 +37,8 @@ import greatHornedOwlAudioSrc from '../assets/great_horned_owl.mp3';
 import westernScreechOwlAudioSrc from '../assets/western_screech_owl.mp3';
 import westernScreechOwlFlyingSrc from '../assets/western_screech_owl_flying.png';
 import commonPoorwillFlyingSrc from '../assets/common_poorwill_flying.png';
-import barnOwlFlyingSrc from '../assets/barn_owl_flying.png';
+import barnOwlRestingSrc from '../assets/barn_owl.png';
+import barnOwlSpriteSheetSrc from '../assets/barn_owl_sprite_sheet.png';
 
 // DOM Elements
 const startScreen = document.getElementById('start-screen');
@@ -113,6 +114,8 @@ const AUDIO_TIP_REMINDER_MESSAGE = 'Turn up sound for the best bird-call clues.'
 const AUDIO_TIP_BOOSTED_MESSAGE = 'Game audio is back up. Check your device volume too.';
 const AUDIO_TIP_BLOCKED_MESSAGE = 'Tap the speaker to retry audio, then check device volume.';
 const MOVING_BIRD_SPEED = 0.12;
+const TRANSPARENT_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+const HORIZONTAL_ONLY_BIRDS = new Set(['barn_owl']);
 
 function getMovingBirdIds() {
   if (gameMode === 'expert') {
@@ -172,7 +175,12 @@ const birdCallSources = {
 const birdFlyingSources = {
   western_screech_owl: westernScreechOwlFlyingSrc,
   common_poorwill: commonPoorwillFlyingSrc,
-  barn_owl: barnOwlFlyingSrc,
+};
+const birdSpriteSheets = {
+  barn_owl: {
+    src: barnOwlSpriteSheetSrc,
+    restingSrc: barnOwlRestingSrc,
+  },
 };
 const birdCallNodes = new Map();
 
@@ -367,16 +375,19 @@ function initializeMovingBirds() {
   const containerRect = gameContainer.getBoundingClientRect();
 
   getMovingBirdIds().forEach(id => {
-    const horizontal = Math.random() > 0.5;
+    const horizontalOnly = HORIZONTAL_ONLY_BIRDS.has(id);
+    const horizontal = horizontalOnly ? true : Math.random() > 0.5;
     const direction = Math.random() > 0.5 ? 1 : -1;
 
     let startX, startY, velocityX, velocityY;
 
     if (horizontal) {
-      startX = direction > 0 ? -5 : containerRect.width + 5;
+      startX = horizontalOnly
+        ? containerRect.width * (0.1 + Math.random() * 0.8)
+        : direction > 0 ? -5 : containerRect.width + 5;
       startY = containerRect.height * (0.25 + Math.random() * 0.45);
       velocityX = direction * MOVING_BIRD_SPEED * containerRect.width;
-      velocityY = (Math.random() - 0.5) * 0.03 * containerRect.height;
+      velocityY = horizontalOnly ? 0 : (Math.random() - 0.5) * 0.03 * containerRect.height;
     } else {
       startX = containerRect.width * (0.2 + Math.random() * 0.6);
       startY = direction > 0 ? -5 : containerRect.height + 5;
@@ -406,6 +417,7 @@ function updateMovingBirds(deltaTime) {
 
     const nextState = updateMovingBirdState(state, deltaTime, {
       movingBirdSpeed: MOVING_BIRD_SPEED,
+      horizontalOnly: HORIZONTAL_ONLY_BIRDS.has(id),
     });
     movingBirdsState.set(id, nextState);
     state = nextState;
@@ -414,7 +426,9 @@ function updateMovingBirds(deltaTime) {
     el.style.left = `${state.xPercent}%`;
     el.style.top = `${state.yPercent}%`;
 
-    if (birdFlyingSources[id]) {
+    updateBirdFacing(id, state.velocityXPercent);
+
+    if (birdFlyingSources[id] || birdSpriteSheets[id]) {
       setBirdFlyingImage(id, state.isMoving);
     }
   });
@@ -425,7 +439,7 @@ function startleMovingBird(id) {
   if (state && state.reactionState === null) {
     const nextState = startleMovingBirdState(state);
     movingBirdsState.set(id, nextState);
-    if (birdFlyingSources[id]) {
+    if (birdFlyingSources[id] || birdSpriteSheets[id]) {
       setBirdFlyingImage(id, nextState.isMoving);
     }
   }
@@ -504,6 +518,12 @@ function applyLowBatteryFlicker() {
 
 function setBirdFlyingImage(id, isFlying) {
   const el = document.getElementById(id);
+
+  if (birdSpriteSheets[id]) {
+    setBirdSpriteImage(id, el, isFlying);
+    return;
+  }
+
   if (!birdFlyingSources[id]) return;
 
   if (isFlying) {
@@ -515,6 +535,27 @@ function setBirdFlyingImage(id, isFlying) {
       el.src = birdFlyingSources[id].replace('_flying.png', '.png');
     }
   }
+}
+
+function setBirdSpriteImage(id, el, isFlying) {
+  const sprite = birdSpriteSheets[id];
+  const spriteState = isFlying ? 'flying' : 'resting';
+
+  if (el.dataset.spriteState === spriteState) {
+    return;
+  }
+
+  el.dataset.spriteState = spriteState;
+  el.classList.toggle('bird-sprite-flying', isFlying);
+  el.style.backgroundImage = isFlying ? `url("${sprite.src}")` : '';
+  el.src = isFlying ? TRANSPARENT_PIXEL : sprite.restingSrc;
+}
+
+function updateBirdFacing(id, velocityXPercent) {
+  if (!birdSpriteSheets[id]) return;
+
+  const el = document.getElementById(id);
+  el.style.scale = velocityXPercent < 0 ? '-1 1' : '1 1';
 }
 
 function updateBirdImagesForMode() {
@@ -1429,6 +1470,8 @@ function startGameLogic() {
     el.classList.remove('missed');
     el.classList.remove('sighted');
     document.getElementById(`check-${id}`).classList.remove('found');
+    setBirdFlyingImage(id, false);
+    updateBirdFacing(id, 1);
   });
 
   // Switch screens

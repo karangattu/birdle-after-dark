@@ -162,6 +162,20 @@ function isValidBirdPosition(position, existingPositions, options) {
     && !overlapsExistingBird(position, existingPositions, options);
 }
 
+function findScannedBirdPosition(existingPositions, options) {
+  for (let top = options.topMin; top < options.topMax; top++) {
+    for (let left = options.leftMin; left < options.leftMax; left++) {
+      const position = { top, left };
+
+      if (isValidBirdPosition(position, existingPositions, options)) {
+        return position;
+      }
+    }
+  }
+
+  return null;
+}
+
 /**
  * Calculates directional audio mix values for hidden bird calls.
  * @param {number} spotlightX - The x coordinate of the flashlight center.
@@ -323,6 +337,12 @@ export function getRandomBirdPosition(existingPositions = [], options = {}) {
 
   if (fallbackPosition) {
     return fallbackPosition;
+  }
+
+  const scannedPosition = findScannedBirdPosition(existingPositions, placementOptions);
+
+  if (scannedPosition) {
+    return scannedPosition;
   }
 
   return {

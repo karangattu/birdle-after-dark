@@ -218,6 +218,28 @@ describe('gameLogic', () => {
       return horizontalDistance < 24 && verticalDistance < 18;
     }
 
+    function hasFreeGridCell(existingPositions) {
+      for (let top = 30; top < 72; top++) {
+        for (let left = 8; left < 84; left++) {
+          const isInChecklistZone = top < 52 && left > 52;
+
+          if (isInChecklistZone) {
+            continue;
+          }
+
+          const overlapsExisting = existingPositions.some(existingPosition => (
+            positionsOverlap({ top, left }, existingPosition)
+          ));
+
+          if (!overlapsExisting) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    }
+
     it('should generate valid coordinates avoiding HUD zones', () => {
       for (let i = 0; i < 100; i++) {
         const pos = getRandomBirdPosition();
@@ -232,15 +254,36 @@ describe('gameLogic', () => {
       }
     });
 
-    it('should avoid positions already assigned to other birds', () => {
+    it('should avoid positions already assigned to other birds when a free cell exists', () => {
       const positions = [];
 
       for (let i = 0; i < 4; i++) {
         const pos = getRandomBirdPosition(positions);
 
-        expect(positions.some(existingPosition => positionsOverlap(pos, existingPosition))).toBe(false);
+        if (hasFreeGridCell(positions)) {
+          expect(positions.some(existingPosition => positionsOverlap(pos, existingPosition))).toBe(false);
+        }
+
         positions.push(pos);
       }
+    });
+
+    it('should return a valid position when random attempts and fixed fallbacks are blocked', () => {
+      const blockedPositions = [
+        { top: 34, left: 10 },
+        { top: 34, left: 34 },
+        { top: 54, left: 18 },
+        { top: 54, left: 62 },
+        { top: 68, left: 40 },
+      ];
+
+      const pos = getRandomBirdPosition(blockedPositions, {
+        maxAttempts: 0,
+        topMax: 90,
+        leftMax: 100,
+      });
+
+      expect(blockedPositions.some(existingPosition => positionsOverlap(pos, existingPosition))).toBe(false);
     });
   });
 

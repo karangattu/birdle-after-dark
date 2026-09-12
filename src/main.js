@@ -5,6 +5,7 @@ import {
   getDirectionalBirdCallMix,
   getEndGamePresentation,
   getFlashlightPositions,
+  getRoundCountdownSteps,
   getStreakFeedback,
   isBirdStartlable,
   isTapInteraction,
@@ -95,6 +96,8 @@ const leaderboardNameInput = document.getElementById('leaderboard-name-input');
 const leaderboardSubmitBtn = document.getElementById('leaderboard-submit-btn');
 const leaderboardNameFeedback = document.getElementById('leaderboard-name-feedback');
 const homeBtn = document.getElementById('home-btn');
+const countdownOverlay = document.getElementById('countdown-overlay');
+const countdownNumber = document.getElementById('countdown-number');
 
 const GAME_DURATION_REGULAR = 60;
 const GAME_DURATION_EXPERT = 40;
@@ -119,6 +122,10 @@ const AUDIO_TIP_BLOCKED_MESSAGE = 'Tap the speaker to retry audio, then check de
 const MOVING_BIRD_SPEED = 0.12;
 const TRANSPARENT_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 const HORIZONTAL_ONLY_BIRDS = new Set(['barn_owl', 'western_screech_owl', 'common_poorwill']);
+const ROUND_COUNTDOWN_STEP_MS = 900;
+const ROUND_COUNTDOWN_GO_MS = 700;
+const ROUND_COUNTDOWN_TONE_FREQUENCY = 660;
+const ROUND_COUNTDOWN_GO_FREQUENCY = 990;
 
 function getMovingBirdIds() {
   if (gameMode === 'expert') {
@@ -166,6 +173,8 @@ let movingBirdsState = new Map();
 let animationFrameId = null;
 let lowBatteryActive = false;
 let lastBeepIndexPlayed = -1;
+let isCountingDown = false;
+let countdownTimeouts = [];
 
 // Initialize birds info
 const birdIds = ['great_horned_owl', 'western_screech_owl', 'barn_owl', 'common_poorwill'];
@@ -1217,7 +1226,7 @@ function openGuessModal(birdId) {
 }
 
 function updateFlashlight(x, y, controlMode = currentControlMode) {
-  if (!isPlaying) return;
+  if (!isPlaying && !isCountingDown) return;
   currentControlMode = controlMode;
 
   const positions = getFlashlightPositions(
@@ -1428,16 +1437,33 @@ function showTutorial() {
   tutorialStartBtn.focus();
 }
 
+function beginTimedPlay() {
+  isPlaying = true;
+
+  // Start loop
+  if (gameInterval) clearInterval(gameInterval);
+  gameInterval = setInterval(gameLoop, 1000);
+
+  startBirdCalls();
+  startMovingBirdAnimation();
+  showAudioTip(AUDIO_TIP_REMINDER_MESSAGE);
+}
+
 function startGameLogic() {
   requestPortableFullscreen();
 
   clearPendingEndGame();
+  cancelRoundCountdown();
+  if (gameInterval) clearInterval(gameInterval);
+  gameInterval = null;
+  stopMovingBirdAnimation();
   timeRemaining = gameMode === 'expert' ? GAME_DURATION_EXPERT : GAME_DURATION_REGULAR;
   foundBirds.clear();
   score = 0;
   correctStreak = 0;
   lastBeepIndexPlayed = -1;
-  isPlaying = true;
+  isPlaying = false;
+  isCountingDown = true;
   isGuessing = false;
   currentBirdTarget = null;
   currentBirdCandidate = null;
@@ -1450,7 +1476,7 @@ function startGameLogic() {
   guessFeedback.classList.add('hidden');
   clearStreakFeedback();
   setBirdCandidate(null);
-  
+
   // Reset UI
   timerEl.innerText = formatTime(timeRemaining);
   updateScoreboard();
@@ -1481,13 +1507,7 @@ function startGameLogic() {
   const centerPoint = getGameViewportCenter();
   updateFlashlight(centerPoint.x, centerPoint.y, 'mouse');
 
-  // Start loop
-  if (gameInterval) clearInterval(gameInterval);
-  gameInterval = setInterval(gameLoop, 1000);
-
-  startBirdCalls();
-  startMovingBirdAnimation();
-  showAudioTip(AUDIO_TIP_REMINDER_MESSAGE);
+  runRoundCountdown(beginTimedPlay);
 }
 
 function showEndScreen(presentation) {
@@ -1511,6 +1531,7 @@ function revealMissedBirds() {
 
 function endGame(result) {
   clearPendingEndGame();
+  cancelRoundCountdown();
   isPlaying = false;
   isGuessing = false;
   currentBirdTarget = null;
@@ -1596,8 +1617,83 @@ function playCountdownBeep(index) {
   oscillator.stop(ctx.currentTime + 0.15);
 }
 
+function playRoundCountdownTone({ frequency, durationSeconds = 0.18, type = 'square', volume = 0.14 } = {}) {
+  const ctx = getAudioContext();
+
+  if (!ctx) {
+    return;
+  }
+
+  const resumePromise = ctx.resume?.();
+
+  if (resumePromise?.catch) {
+    resumePromise.catch(err => {
+      console.log('Countdown audio resume failed:', err);
+    });
+  }
+
+  const oscillator = ctx.createOscillator();
+  const gainNode = ctx.createGain();
+  const now = ctx.currentTime;
+
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(frequency, now);
+
+  gainNode.gain.setValueAtTime(volume, now);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, now + durationSeconds);
+
+  oscillator.connect(gainNode);
+  gainNode.connect(ctx.destination);
+
+  oscillator.start(now);
+  oscillator.stop(now + durationSeconds);
+}
+
+function cancelRoundCountdown() {
+  countdownTimeouts.forEach(timeoutId => window.clearTimeout(timeoutId));
+  countdownTimeouts = [];
+  isCountingDown = false;
+  countdownOverlay?.classList.add('hidden');
+}
+
+function runRoundCountdown(onComplete) {
+  cancelRoundCountdown();
+  isCountingDown = true;
+  countdownOverlay?.classList.remove('hidden');
+
+  getRoundCountdownSteps().forEach((step, index) => {
+    const isGoStep = step === 'Go!';
+    const delayMs = index * ROUND_COUNTDOWN_STEP_MS;
+
+    const timeoutId = window.setTimeout(() => {
+      if (countdownNumber) {
+        countdownNumber.innerText = step;
+        countdownNumber.classList.remove('pop');
+        // Force reflow so the pop animation restarts on every step.
+        void countdownNumber.offsetWidth;
+        countdownNumber.classList.add('pop');
+      }
+
+      playRoundCountdownTone({
+        frequency: isGoStep ? ROUND_COUNTDOWN_GO_FREQUENCY : ROUND_COUNTDOWN_TONE_FREQUENCY,
+        durationSeconds: isGoStep ? 0.4 : 0.18,
+      });
+
+      if (isGoStep) {
+        const hideTimeoutId = window.setTimeout(() => {
+          cancelRoundCountdown();
+          onComplete?.();
+        }, ROUND_COUNTDOWN_GO_MS);
+        countdownTimeouts.push(hideTimeoutId);
+      }
+    }, delayMs);
+
+    countdownTimeouts.push(timeoutId);
+  });
+}
+
 function gameLoop() {
-  if (isGuessing) return;
+  if (isGuessing || isCountingDown) return;
 
   timeRemaining--;
   timerEl.innerText = formatTime(timeRemaining);
@@ -1616,7 +1712,7 @@ function gameLoop() {
 }
 
 function handleRegister() {
-  if (!isPlaying || isGuessing) return;
+  if (!isPlaying || isGuessing || isCountingDown) return;
 
   openGuessModal(currentBirdCandidate);
 }
@@ -1634,7 +1730,7 @@ function releaseTrackedPointer(pointerId) {
 }
 
 function handlePointerDown(event) {
-  if (!isPlaying || isGuessing || event.button !== 0) {
+  if (!isPlaying || isGuessing || isCountingDown || event.button !== 0) {
     return;
   }
 
@@ -1651,7 +1747,7 @@ function handlePointerDown(event) {
 }
 
 function handlePointerMove(event) {
-  if (!isPlaying || isGuessing) {
+  if (!isPlaying || isGuessing || isCountingDown) {
     return;
   }
 
@@ -1671,6 +1767,11 @@ function handlePointerMove(event) {
 }
 
 function handlePointerUp(event) {
+  if (isCountingDown || !isPlaying) {
+    releaseTrackedPointer(event.pointerId);
+    return;
+  }
+
   if (event.pointerType !== 'mouse' && activePointerId !== event.pointerId) {
     return;
   }
@@ -1850,6 +1951,7 @@ installPromptInstallBtn?.addEventListener('click', promptInstallApp);
 installPromptDismissBtn?.addEventListener('click', dismissInstallPrompt);
 leaderboardSubmitBtn.addEventListener('click', handleScoreSubmission);
 homeBtn.addEventListener('click', () => {
+  cancelRoundCountdown();
   resetLeaderboardState();
   endScreen.classList.remove('active');
   startScreen.classList.add('active');

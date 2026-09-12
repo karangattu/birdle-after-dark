@@ -355,6 +355,12 @@ export function getRandomBirdPosition(existingPositions = [], options = {}) {
   };
 }
 
+export const ROUND_COUNTDOWN_STEPS = ['3', '2', '1', 'Go!'];
+
+export function getRoundCountdownSteps() {
+  return [...ROUND_COUNTDOWN_STEPS];
+}
+
 export function startleMovingBirdState(state, options = {}) {
   const continueDuration = options.continueFlyingDuration ?? 1.0;
   const newState = { ...state };

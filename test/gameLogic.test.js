@@ -198,12 +198,12 @@ describe('gameLogic', () => {
       });
     });
 
-    it('should keep touch control on the hand while offsetting the spotlight above it', () => {
+    it('should keep touch control on the hand while lifting the spotlight above it', () => {
       expect(
         getFlashlightPositions(200, 300, 'touch', { width: 300, height: 164 })
       ).toEqual({
         spotlightX: 169,
-        spotlightY: 234,
+        spotlightY: 105,
         handX: 15,
         handY: 175,
       });

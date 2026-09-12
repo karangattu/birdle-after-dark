@@ -5,6 +5,8 @@ import {
   getDirectionalBirdCallMix,
   getEndGamePresentation,
   getFlashlightPositions,
+  getNearestUnfoundBirdDistance,
+  getProximityBand,
   getRoundCountdownSteps,
   getStreakFeedback,
   isBirdStartlable,
@@ -98,6 +100,14 @@ const leaderboardNameFeedback = document.getElementById('leaderboard-name-feedba
 const homeBtn = document.getElementById('home-btn');
 const countdownOverlay = document.getElementById('countdown-overlay');
 const countdownNumber = document.getElementById('countdown-number');
+const pauseOverlay = document.getElementById('pause-overlay');
+const resumeBtn = document.getElementById('resume-btn');
+const pauseBtn = document.getElementById('pause-btn');
+const quitBtn = document.getElementById('quit-btn');
+const pauseQuitBtn = document.getElementById('pause-quit-btn');
+const sightingKicker = document.getElementById('sighting-kicker');
+const sightingTitle = document.getElementById('sighting-title');
+const checklistToggle = document.getElementById('checklist-toggle');
 
 const GAME_DURATION_REGULAR = 60;
 const GAME_DURATION_EXPERT = 40;
@@ -126,6 +136,13 @@ const ROUND_COUNTDOWN_STEP_MS = 900;
 const ROUND_COUNTDOWN_GO_MS = 700;
 const ROUND_COUNTDOWN_TONE_FREQUENCY = 660;
 const ROUND_COUNTDOWN_GO_FREQUENCY = 990;
+const TIMER_WARN_THRESHOLD = 15;
+const TIMER_DANGER_THRESHOLD = 10;
+const BEAM_SMOOTHING_RATE = 18;
+const BEAM_AUDIO_UPDATE_INTERVAL = 0.15;
+const CANDIDATE_REFRESH_MIN_MOVE_PX = 0.75;
+const SCORE_COUNT_UP_MS = 500;
+const WARM_TICK_FREQUENCY = 1200;
 
 function getMovingBirdIds() {
   if (gameMode === 'expert') {
@@ -175,6 +192,23 @@ let lowBatteryActive = false;
 let lastBeepIndexPlayed = -1;
 let isCountingDown = false;
 let countdownTimeouts = [];
+let isPaused = false;
+let targetSpotX = window.innerWidth / 2;
+let targetSpotY = window.innerHeight / 2;
+let renderedSpotX = targetSpotX;
+let renderedSpotY = targetSpotY;
+let targetHandX = 0;
+let targetHandY = 0;
+let renderedHandX = 0;
+let renderedHandY = 0;
+let lastCandidateSpotX = null;
+let lastCandidateSpotY = null;
+let beamAudioAccumulator = 0;
+let displayedScore = 0;
+let scoreAnimFrame = null;
+let roundGuesses = 0;
+let roundBestStreak = 0;
+let isWarmHintShown = false;
 
 // Initialize birds info
 const birdIds = ['great_horned_owl', 'western_screech_owl', 'barn_owl', 'common_poorwill'];
@@ -492,7 +526,7 @@ function startMovingBirdAnimation() {
   let lastTime = performance.now();
 
   const animate = (currentTime) => {
-    if (!isPlaying) {
+    if (!isPlaying || isPaused) {
       animationFrameId = null;
       return;
     }
@@ -500,9 +534,16 @@ function startMovingBirdAnimation() {
     const deltaTime = (currentTime - lastTime) / 1000;
     lastTime = currentTime;
 
+    smoothBeamTowardsTarget(deltaTime);
+
+    beamAudioAccumulator += deltaTime;
+    if (beamAudioAccumulator >= BEAM_AUDIO_UPDATE_INTERVAL) {
+      beamAudioAccumulator = 0;
+      updateBirdCallAudio();
+    }
+
     updateMovingBirds(deltaTime);
     checkMovingBirdDetection();
-    applyLowBatteryFlicker();
 
     animationFrameId = requestAnimationFrame(animate);
   };
@@ -525,12 +566,46 @@ function flickerBeamRadius() {
   return 40;
 }
 
-function applyLowBatteryFlicker() {
-  if (!lowBatteryActive) return;
+function renderBeam() {
+  currentMouseX = renderedSpotX;
+  currentMouseY = renderedSpotY;
 
-  const beamRadius = flickerBeamRadius();
+  const beamRadius = lowBatteryActive ? flickerBeamRadius() : FLASHLIGHT_RADIUS;
 
-  darknessOverlay.style.background = `radial-gradient(circle at ${currentMouseX}px ${currentMouseY}px, transparent ${beamRadius}px, rgba(0,0,0,0.98) ${beamRadius + 20}px)`;
+  darknessOverlay.style.background = `radial-gradient(circle at ${renderedSpotX}px ${renderedSpotY}px, transparent ${beamRadius}px, rgba(0,0,0,0.98) ${beamRadius + 20}px)`;
+  flashlightHand.style.left = `${renderedHandX}px`;
+  flashlightHand.style.top = `${renderedHandY}px`;
+
+  const movedX = lastCandidateSpotX === null ? Infinity : Math.abs(renderedSpotX - lastCandidateSpotX);
+  const movedY = lastCandidateSpotY === null ? Infinity : Math.abs(renderedSpotY - lastCandidateSpotY);
+
+  if (movedX > CANDIDATE_REFRESH_MIN_MOVE_PX || movedY > CANDIDATE_REFRESH_MIN_MOVE_PX) {
+    lastCandidateSpotX = renderedSpotX;
+    lastCandidateSpotY = renderedSpotY;
+    refreshBirdCandidate();
+  }
+}
+
+function smoothBeamTowardsTarget(deltaTime) {
+  const blend = Math.min(1, deltaTime * BEAM_SMOOTHING_RATE);
+
+  renderedSpotX += (targetSpotX - renderedSpotX) * blend;
+  renderedSpotY += (targetSpotY - renderedSpotY) * blend;
+  renderedHandX += (targetHandX - renderedHandX) * blend;
+  renderedHandY += (targetHandY - renderedHandY) * blend;
+
+  renderBeam();
+}
+
+function snapBeamToTarget() {
+  renderedSpotX = targetSpotX;
+  renderedSpotY = targetSpotY;
+  renderedHandX = targetHandX;
+  renderedHandY = targetHandY;
+  lastCandidateSpotX = null;
+  lastCandidateSpotY = null;
+  beamAudioAccumulator = 0;
+  renderBeam();
 }
 
 function setBirdFlyingImage(id, isFlying) {
@@ -669,9 +744,86 @@ async function handleLeaderboardRealtimeUpdate() {
   await loadGlobalHighScore();
 }
 
-function updateScoreboard() {
-  scoreCountEl.innerText = formatScore(score);
+function updateScoreboard(instant = false) {
   highScoreCountEl.innerText = formatScore(highScore);
+
+  if (instant) {
+    if (scoreAnimFrame) {
+      cancelAnimationFrame(scoreAnimFrame);
+      scoreAnimFrame = null;
+    }
+
+    displayedScore = score;
+    scoreCountEl.innerText = formatScore(score);
+    return;
+  }
+
+  const startValue = displayedScore;
+  const delta = score - startValue;
+
+  if (delta === 0) {
+    scoreCountEl.innerText = formatScore(score);
+    return;
+  }
+
+  if (scoreAnimFrame) {
+    cancelAnimationFrame(scoreAnimFrame);
+    scoreAnimFrame = null;
+  }
+
+  const startTime = performance.now();
+
+  const tick = (now) => {
+    const t = Math.min(1, (now - startTime) / SCORE_COUNT_UP_MS);
+    const eased = 1 - Math.pow(1 - t, 3);
+
+    displayedScore = Math.round(startValue + delta * eased);
+    scoreCountEl.innerText = formatScore(displayedScore);
+
+    if (t < 1) {
+      scoreAnimFrame = requestAnimationFrame(tick);
+    } else {
+      scoreAnimFrame = null;
+      displayedScore = score;
+    }
+  };
+
+  scoreAnimFrame = requestAnimationFrame(tick);
+}
+
+function updateTimerStages() {
+  timerEl.classList.toggle(
+    'warn',
+    timeRemaining <= TIMER_WARN_THRESHOLD && timeRemaining > TIMER_DANGER_THRESHOLD,
+  );
+  timerEl.classList.toggle('danger', timeRemaining <= TIMER_DANGER_THRESHOLD);
+}
+
+function setChecklistCollapsed(collapsed) {
+  checklist.classList.toggle('collapsed', collapsed);
+  checklistToggle.setAttribute('aria-expanded', String(!collapsed));
+  checklistToggle.setAttribute(
+    'aria-label',
+    collapsed ? 'Expand checklist' : 'Collapse checklist',
+  );
+  checklistToggle.innerText = collapsed ? '+' : '–';
+}
+
+function spawnFloatPoints(points) {
+  const floatEl = document.createElement('div');
+  floatEl.className = 'float-points';
+  floatEl.innerText = `+${formatScore(points)}`;
+  floatEl.style.left = `${currentMouseX}px`;
+  floatEl.style.top = `${currentMouseY}px`;
+  gameScreen.append(floatEl);
+
+  window.setTimeout(() => {
+    floatEl.remove();
+  }, 1100);
+}
+
+function clearFloatPoints() {
+  gameScreen.querySelectorAll('.float-points').forEach(el => el.remove());
 }
 
 function clearStreakFeedback() {
@@ -706,7 +858,7 @@ function updateHighScore() {
 
   highScore = score;
   storeHighScore(highScore);
-  updateScoreboard();
+  updateScoreboard(true);
 
   return true;
 }
@@ -715,10 +867,22 @@ function renderEndScoreSummary(isNewHighScore) {
   endScoreSummary.innerHTML = '';
 
   const modeLabel = gameMode === 'expert' ? 'Expert' : 'Regular';
+  const gameDuration = gameMode === 'expert' ? GAME_DURATION_EXPERT : GAME_DURATION_REGULAR;
+  const elapsed = Math.max(0, gameDuration - Math.max(0, timeRemaining));
+  const correctCount = foundBirds.size;
+  const accuracyLabel = roundGuesses > 0
+    ? `${Math.round((correctCount / roundGuesses) * 100)}% (${correctCount}/${roundGuesses})`
+    : '—';
+  const avgPerBirdLabel = correctCount > 0
+    ? `${(elapsed / correctCount).toFixed(1)}s`
+    : '—';
   const rows = [
     ['Mode', modeLabel],
     ['Score', formatScore(score)],
     ['Best', formatScore(highScore)],
+    ['Accuracy', accuracyLabel],
+    ['Best streak', String(roundBestStreak)],
+    ['Avg. per bird', avgPerBirdLabel],
   ];
 
   rows.forEach(([label, value]) => {
@@ -1183,6 +1347,59 @@ function pauseBirdCalls() {
   });
 }
 
+function playWarmTick() {
+  const ctx = getAudioContext();
+
+  if (!ctx) {
+    return;
+  }
+
+  const oscillator = ctx.createOscillator();
+  const gainNode = ctx.createGain();
+  const now = ctx.currentTime;
+
+  oscillator.type = 'sine';
+  oscillator.frequency.setValueAtTime(WARM_TICK_FREQUENCY, now);
+
+  gainNode.gain.setValueAtTime(0.05, now);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+  oscillator.connect(gainNode);
+  gainNode.connect(ctx.destination);
+
+  oscillator.start(now);
+  oscillator.stop(now + 0.08);
+}
+
+function setWarmHint(show) {
+  if (show === isWarmHintShown) {
+    return;
+  }
+
+  isWarmHintShown = show;
+
+  if (show) {
+    hudBottom.classList.remove('hidden');
+    sightingPanel.classList.remove('hidden');
+    sightingPanel.classList.add('warm');
+    sightingKicker.innerText = 'Signal rising';
+    sightingTitle.innerText = 'Getting warmer…';
+    identifyBtn.disabled = true;
+    identifyBtn.classList.remove('pulse');
+    playWarmTick();
+    return;
+  }
+
+  sightingPanel.classList.remove('warm');
+  sightingKicker.innerText = 'Bird in beam';
+  sightingTitle.innerText = 'Ready to identify';
+
+  if (!currentBirdCandidate) {
+    hudBottom.classList.add('hidden');
+    sightingPanel.classList.add('hidden');
+  }
+}
+
 function setBirdCandidate(birdId) {
   currentBirdCandidate = birdId;
 
@@ -1191,25 +1408,52 @@ function setBirdCandidate(birdId) {
   });
 
   const hasCandidate = Boolean(birdId);
+
+  if (hasCandidate && isWarmHintShown) {
+    isWarmHintShown = false;
+    sightingPanel.classList.remove('warm');
+    sightingKicker.innerText = 'Bird in beam';
+    sightingTitle.innerText = 'Ready to identify';
+  }
+
   hudBottom.classList.toggle('hidden', !hasCandidate);
   sightingPanel.classList.toggle('hidden', !hasCandidate);
   identifyBtn.disabled = !hasCandidate;
+  identifyBtn.classList.toggle('pulse', hasCandidate);
 }
 
 function refreshBirdCandidate() {
-  if (!isPlaying || isGuessing) {
+  if (!isPlaying || isGuessing || isPaused) {
     return;
   }
 
+  const birdsInfo = getMovingBirdsInfo();
   const birdId = getBirdCandidateInBeam(
     currentMouseX,
     currentMouseY,
-    getMovingBirdsInfo(),
+    birdsInfo,
     FLASHLIGHT_RADIUS,
     foundBirds,
   );
 
-  setBirdCandidate(birdId);
+  if (birdId) {
+    setWarmHint(false);
+    setBirdCandidate(birdId);
+    return;
+  }
+
+  setBirdCandidate(null);
+
+  const nearest = getNearestUnfoundBirdDistance(
+    currentMouseX,
+    currentMouseY,
+    birdsInfo,
+    foundBirds,
+  );
+
+  setWarmHint(
+    Boolean(nearest && getProximityBand(nearest.distance, FLASHLIGHT_RADIUS) === 'warm'),
+  );
 }
 
 function openGuessModal(birdId) {
@@ -1220,13 +1464,14 @@ function openGuessModal(birdId) {
   isGuessing = true;
   currentBirdTarget = birdId;
   setBirdCandidate(null);
+  setWarmHint(false);
   guessModal.classList.remove('hidden');
   guessFeedback.classList.add('hidden');
   updateBirdCallAudio();
 }
 
 function updateFlashlight(x, y, controlMode = currentControlMode) {
-  if (!isPlaying && !isCountingDown) return;
+  if ((!isPlaying && !isCountingDown) || isPaused) return;
   currentControlMode = controlMode;
 
   const positions = getFlashlightPositions(
@@ -1236,20 +1481,19 @@ function updateFlashlight(x, y, controlMode = currentControlMode) {
     getHandRenderSize(),
   );
 
-  currentMouseX = positions.spotlightX;
-  currentMouseY = positions.spotlightY;
+  targetSpotX = positions.spotlightX;
+  targetSpotY = positions.spotlightY;
+  targetHandX = positions.handX;
+  targetHandY = positions.handY;
 
-  const beamRadius = lowBatteryActive ? flickerBeamRadius() : 40;
+  if (!isPlaying) {
+    snapBeamToTarget();
+    return;
+  }
 
-  // Update mask
-  darknessOverlay.style.background = `radial-gradient(circle at ${positions.spotlightX}px ${positions.spotlightY}px, transparent ${beamRadius}px, rgba(0,0,0,0.98) ${beamRadius + 20}px)`;
-  
-  // Update hand position
-  flashlightHand.style.left = `${positions.handX}px`;
-  flashlightHand.style.top = `${positions.handY}px`;
-
-  refreshBirdCandidate();
-  updateBirdCallAudio();
+  if (!animationFrameId) {
+    smoothBeamTowardsTarget(1);
+  }
 }
 
 function randomizeBirds() {
@@ -1437,6 +1681,80 @@ function showTutorial() {
   tutorialStartBtn.focus();
 }
 
+function pauseGame() {
+  if (isPaused || isCountingDown) {
+    return;
+  }
+
+  if (!gameScreen.classList.contains('active') || !isPlaying) {
+    return;
+  }
+
+  isPaused = true;
+  snapBeamToTarget();
+  clearInterval(gameInterval);
+  gameInterval = null;
+  stopMovingBirdAnimation();
+  pauseBirdCalls();
+  releaseTrackedPointer(activePointerId);
+  pauseOverlay.classList.remove('hidden');
+  resumeBtn.focus?.();
+}
+
+function resumeGame() {
+  if (!isPaused) {
+    return;
+  }
+
+  isPaused = false;
+  pauseOverlay.classList.add('hidden');
+
+  if (!gameScreen.classList.contains('active') || !isPlaying) {
+    return;
+  }
+
+  if (gameInterval) clearInterval(gameInterval);
+  gameInterval = setInterval(gameLoop, 1000);
+  playActiveBirdCalls();
+  startMovingBirdAnimation();
+}
+
+function quitToHome() {
+  cancelRoundCountdown();
+  clearPendingEndGame();
+  isPaused = false;
+  pauseOverlay.classList.add('hidden');
+  isPlaying = false;
+  isGuessing = false;
+  currentBirdTarget = null;
+  currentBirdCandidate = null;
+  correctStreak = 0;
+  activePointerId = null;
+  pointerStartPosition = null;
+  clearInterval(gameInterval);
+  gameInterval = null;
+  stopMovingBirdAnimation();
+  setBirdCandidate(null);
+  setWarmHint(false);
+  clearStreakFeedback();
+  clearFloatPoints();
+  guessModal.classList.add('hidden');
+  guessFeedback.classList.add('hidden');
+
+  stopLowBattery();
+  timerEl.classList.remove('warn', 'danger');
+  lastBeepIndexPlayed = -1;
+
+  pauseBirdCalls();
+  hideAudioTip();
+  resetLeaderboardState();
+  gameScreen.classList.remove('active');
+  endScreen.classList.remove('active');
+  startScreen.classList.add('active');
+  playOpeningAudio();
+  loadGlobalHighScore();
+}
+
 function beginTimedPlay() {
   isPlaying = true;
 
@@ -1461,9 +1779,13 @@ function startGameLogic() {
   foundBirds.clear();
   score = 0;
   correctStreak = 0;
+  roundGuesses = 0;
+  roundBestStreak = 0;
   lastBeepIndexPlayed = -1;
   isPlaying = false;
   isCountingDown = true;
+  isPaused = false;
+  pauseOverlay.classList.add('hidden');
   isGuessing = false;
   currentBirdTarget = null;
   currentBirdCandidate = null;
@@ -1475,11 +1797,15 @@ function startGameLogic() {
   guessModal.classList.add('hidden');
   guessFeedback.classList.add('hidden');
   clearStreakFeedback();
+  clearFloatPoints();
   setBirdCandidate(null);
+  setWarmHint(false);
 
   // Reset UI
   timerEl.innerText = formatTime(timeRemaining);
-  updateScoreboard();
+  updateTimerStages();
+  updateScoreboard(true);
+  setChecklistCollapsed(window.innerWidth < 640);
   birdsFoundCountEl.innerText = '0';
   birdIds.forEach(id => {
     const el = document.getElementById(id);
@@ -1532,6 +1858,8 @@ function revealMissedBirds() {
 function endGame(result) {
   clearPendingEndGame();
   cancelRoundCountdown();
+  isPaused = false;
+  pauseOverlay.classList.add('hidden');
   isPlaying = false;
   isGuessing = false;
   currentBirdTarget = null;
@@ -1543,10 +1871,11 @@ function endGame(result) {
   gameInterval = null;
   stopMovingBirdAnimation();
   setBirdCandidate(null);
+  setWarmHint(false);
   clearStreakFeedback();
   guessModal.classList.add('hidden');
   guessFeedback.classList.add('hidden');
-  
+
   stopLowBattery();
   lastBeepIndexPlayed = -1;
 
@@ -1693,10 +2022,11 @@ function runRoundCountdown(onComplete) {
 }
 
 function gameLoop() {
-  if (isGuessing || isCountingDown) return;
+  if (isGuessing || isCountingDown || isPaused) return;
 
   timeRemaining--;
   timerEl.innerText = formatTime(timeRemaining);
+  updateTimerStages();
 
   if (isLowBatteryTime(timeRemaining)) {
     startLowBattery();
@@ -1712,7 +2042,7 @@ function gameLoop() {
 }
 
 function handleRegister() {
-  if (!isPlaying || isGuessing || isCountingDown) return;
+  if (!isPlaying || isGuessing || isCountingDown || isPaused) return;
 
   openGuessModal(currentBirdCandidate);
 }
@@ -1730,7 +2060,7 @@ function releaseTrackedPointer(pointerId) {
 }
 
 function handlePointerDown(event) {
-  if (!isPlaying || isGuessing || isCountingDown || event.button !== 0) {
+  if (!isPlaying || isGuessing || isCountingDown || isPaused || event.button !== 0) {
     return;
   }
 
@@ -1747,7 +2077,7 @@ function handlePointerDown(event) {
 }
 
 function handlePointerMove(event) {
-  if (!isPlaying || isGuessing || isCountingDown) {
+  if (!isPlaying || isGuessing || isCountingDown || isPaused) {
     return;
   }
 
@@ -1767,7 +2097,7 @@ function handlePointerMove(event) {
 }
 
 function handlePointerUp(event) {
-  if (isCountingDown || !isPlaying) {
+  if (isCountingDown || isPaused || !isPlaying) {
     releaseTrackedPointer(event.pointerId);
     return;
   }
@@ -1836,7 +2166,7 @@ function playActiveBirdCalls() {
 function handleAudioTipButtonClick() {
   const adjusted = ensureGameAudioLevels();
 
-  if (isPlaying) {
+  if (isPlaying && !isPaused) {
     playActiveBirdCalls();
   } else if (startScreen.classList.contains('active') || videoScreen.classList.contains('active')) {
     playOpeningAudio();
@@ -1849,7 +2179,8 @@ function handleAudioTipButtonClick() {
 guessBtns.forEach(btn => {
   btn.addEventListener('click', (e) => {
     const guessedBird = e.target.getAttribute('data-bird');
-    
+    roundGuesses += 1;
+
     if (guessedBird === currentBirdTarget) {
       // Correct guess
       if (navigator.vibrate) navigator.vibrate(100); // Short buzz
@@ -1859,10 +2190,12 @@ guessBtns.forEach(btn => {
       guessModal.classList.add('hidden');
       foundBirds.add(foundBirdId);
       correctStreak += 1;
+      roundBestStreak = Math.max(roundBestStreak, correctStreak);
       const pointsEarned = calculateIdentificationScore(timeRemaining, correctStreak);
       score += pointsEarned;
       updateScoreboard();
       showStreakFeedback(getStreakFeedback(correctStreak), pointsEarned);
+      spawnFloatPoints(pointsEarned);
       
       // Update UI
       document.getElementById(foundBirdId).classList.add('found');
@@ -1882,14 +2215,16 @@ guessBtns.forEach(btn => {
       guessFeedback.classList.remove('hidden');
       correctStreak = 0;
       timeRemaining -= 5;
-      
+
       if (timeRemaining <= 0) {
         timeRemaining = 0;
         timerEl.innerText = formatTime(timeRemaining);
+        updateTimerStages();
         guessModal.classList.add('hidden');
         endGame('loss');
       } else {
         timerEl.innerText = formatTime(timeRemaining);
+        updateTimerStages();
       }
     }
   });
@@ -1901,7 +2236,7 @@ modeRegularBtn.addEventListener('click', () => {
   saveGameMode(gameMode);
   updateModeButtons();
   highScore = readStoredHighScore();
-  updateScoreboard();
+  updateScoreboard(true);
   loadGlobalHighScore();
   subscribeToLeaderboard(gameMode, handleLeaderboardRealtimeUpdate);
 });
@@ -1911,7 +2246,7 @@ modeExpertBtn.addEventListener('click', () => {
   saveGameMode(gameMode);
   updateModeButtons();
   highScore = readStoredHighScore();
-  updateScoreboard();
+  updateScoreboard(true);
   loadGlobalHighScore();
   subscribeToLeaderboard(gameMode, handleLeaderboardRealtimeUpdate);
 });
@@ -1919,7 +2254,8 @@ modeExpertBtn.addEventListener('click', () => {
 gameMode = loadGameMode();
 highScore = readStoredHighScore();
 updateModeButtons();
-updateScoreboard();
+displayedScore = score;
+updateScoreboard(true);
 
 startBtn.addEventListener('click', startGame);
 restartBtn.addEventListener('click', startGame);
@@ -1950,13 +2286,18 @@ audioTipButton.addEventListener('click', handleAudioTipButtonClick);
 installPromptInstallBtn?.addEventListener('click', promptInstallApp);
 installPromptDismissBtn?.addEventListener('click', dismissInstallPrompt);
 leaderboardSubmitBtn.addEventListener('click', handleScoreSubmission);
-homeBtn.addEventListener('click', () => {
-  cancelRoundCountdown();
-  resetLeaderboardState();
-  endScreen.classList.remove('active');
-  startScreen.classList.add('active');
-  playOpeningAudio();
-  loadGlobalHighScore();
+homeBtn.addEventListener('click', quitToHome);
+pauseBtn.addEventListener('click', pauseGame);
+resumeBtn.addEventListener('click', resumeGame);
+quitBtn.addEventListener('click', quitToHome);
+pauseQuitBtn.addEventListener('click', quitToHome);
+checklistToggle.addEventListener('click', () => {
+  setChecklistCollapsed(!checklist.classList.contains('collapsed'));
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    pauseGame();
+  }
 });
 leaderboardNameInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') handleScoreSubmission();

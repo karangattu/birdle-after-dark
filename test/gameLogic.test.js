@@ -6,6 +6,8 @@ import {
   getEndGamePresentation,
   getBirdCandidateInBeam,
   getFlashlightPositions,
+  getNearestUnfoundBirdDistance,
+  getProximityBand,
   getStreakFeedback,
   isBirdStartlable,
   isGameOver,
@@ -174,6 +176,49 @@ describe('gameLogic', () => {
         revealMissedBirds: true,
         endScreenDelayMs: 3000,
       });
+    });
+  });
+
+  describe('getNearestUnfoundBirdDistance', () => {
+    const birds = [
+      { id: 'bird1', x: 100, y: 100 },
+      { id: 'bird2', x: 300, y: 400 },
+    ];
+
+    it('should return the closest unfound bird and its distance', () => {
+      const nearest = getNearestUnfoundBirdDistance(110, 100, birds, new Set());
+      expect(nearest.id).toBe('bird1');
+      expect(nearest.distance).toBeCloseTo(10);
+    });
+
+    it('should skip birds that have already been found', () => {
+      const nearest = getNearestUnfoundBirdDistance(110, 100, birds, new Set(['bird1']));
+      expect(nearest.id).toBe('bird2');
+    });
+
+    it('should return null when every bird is found or the list is empty', () => {
+      expect(getNearestUnfoundBirdDistance(110, 100, birds, new Set(['bird1', 'bird2']))).toBeNull();
+      expect(getNearestUnfoundBirdDistance(110, 100, [], new Set())).toBeNull();
+    });
+  });
+
+  describe('getProximityBand', () => {
+    it('should report hot inside the beam radius', () => {
+      expect(getProximityBand(40, 40)).toBe('hot');
+    });
+
+    it('should report warm just outside the beam radius', () => {
+      expect(getProximityBand(41, 40)).toBe('warm');
+      expect(getProximityBand(88, 40)).toBe('warm');
+    });
+
+    it('should report null far outside the near-miss zone', () => {
+      expect(getProximityBand(89, 40)).toBeNull();
+    });
+
+    it('should report null for invalid inputs', () => {
+      expect(getProximityBand(NaN, 40)).toBeNull();
+      expect(getProximityBand(10, 0)).toBeNull();
     });
   });
 

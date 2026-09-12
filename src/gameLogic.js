@@ -355,6 +355,57 @@ export function getRandomBirdPosition(existingPositions = [], options = {}) {
   };
 }
 
+export const NEAR_MISS_RADIUS_MULTIPLIER = 2.2;
+
+export function getNearestUnfoundBirdDistance(
+  spotlightX,
+  spotlightY,
+  birdsInfo,
+  foundBirdIds = new Set(),
+) {
+  const foundBirdSet = foundBirdIds instanceof Set
+    ? foundBirdIds
+    : new Set(foundBirdIds);
+
+  let nearest = null;
+
+  for (const bird of birdsInfo) {
+    if (!bird || foundBirdSet.has(bird.id)) {
+      continue;
+    }
+
+    const deltaX = spotlightX - bird.x;
+    const deltaY = spotlightY - bird.y;
+    const distance = Math.hypot(deltaX, deltaY);
+
+    if (!nearest || distance < nearest.distance) {
+      nearest = { id: bird.id, distance };
+    }
+  }
+
+  return nearest;
+}
+
+export function getProximityBand(
+  distance,
+  radius,
+  multiplier = NEAR_MISS_RADIUS_MULTIPLIER,
+) {
+  if (typeof distance !== 'number' || !Number.isFinite(distance) || radius <= 0) {
+    return null;
+  }
+
+  if (distance <= radius) {
+    return 'hot';
+  }
+
+  if (distance <= radius * multiplier) {
+    return 'warm';
+  }
+
+  return null;
+}
+
 export const ROUND_COUNTDOWN_STEPS = ['3', '2', '1', 'Go!'];
 
 export function getRoundCountdownSteps() {

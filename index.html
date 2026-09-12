@@ -145,8 +145,12 @@
             <span>Best <strong id="high-score-count">0</strong></span>
           </div>
         </div>
+        <div id="hud-actions">
+          <button id="pause-btn" class="hud-icon-btn" type="button" aria-label="Pause game">⏸</button>
+          <button id="quit-btn" class="hud-icon-btn" type="button" aria-label="Quit to home">✕</button>
+        </div>
         <div id="checklist">
-          <h3>Birds Found (<span id="birds-found-count">0</span>/4)</h3>
+          <h3><span>Birds Found (<span id="birds-found-count">0</span>/4)</span><button id="checklist-toggle" class="checklist-toggle" type="button" aria-expanded="true" aria-label="Collapse checklist">–</button></h3>
           <ul>
             <li id="check-great_horned_owl">Great Horned Owl</li>
             <li id="check-western_screech_owl">Western Screech Owl</li>
@@ -160,8 +164,8 @@
       <div id="hud-bottom" class="hidden">
         <div id="sighting-panel" class="sighting-panel hidden" aria-live="polite">
           <div class="sighting-copy">
-            <span>Bird in beam</span>
-            <strong>Ready to identify</strong>
+            <span id="sighting-kicker">Bird in beam</span>
+            <strong id="sighting-title">Ready to identify</strong>
           </div>
           <button id="identify-btn" class="identify-btn" type="button" disabled>Identify</button>
         </div>
@@ -188,6 +192,17 @@
 
       <div id="countdown-overlay" class="countdown-overlay hidden" aria-live="assertive">
         <span id="countdown-number">3</span>
+      </div>
+
+      <div id="pause-overlay" class="pause-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+        <div class="pause-content">
+          <h2 id="pause-title">Paused</h2>
+          <p>Take your time — the clock is frozen.</p>
+          <div class="pause-actions">
+            <button id="resume-btn" class="primary-btn" type="button">Resume</button>
+            <button id="pause-quit-btn" class="secondary-btn" type="button">Quit</button>
+          </div>
+        </div>
       </div>
     </div>
 

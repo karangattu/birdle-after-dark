@@ -37,7 +37,6 @@ import {
 } from './leaderboard.js';
 import barnOwlAudioSrc from '../assets/barn_owl.mp3';
 import commonPoorwillAudioSrc from '../assets/common_poorwill.mp3';
-import gameStartAudioSrc from '../assets/game_start_audio.mp3';
 import greatHornedOwlAudioSrc from '../assets/great_horned_owl.mp3';
 import westernScreechOwlAudioSrc from '../assets/western_screech_owl.mp3';
 import westernScreechOwlRestingSrc from '../assets/western_screech_owl.png';
@@ -119,7 +118,6 @@ const PORTABLE_FULLSCREEN_QUERY = '(pointer: coarse), (any-pointer: coarse)';
 const BIRD_PLACEMENT_PADDING = 18;
 const BIRD_PLACEMENT_ATTEMPTS = 180;
 const BOTTOM_HUD_RESERVED_HEIGHT = 92;
-const OPENING_AUDIO_VOLUME = 0.42;
 const BIRD_CALL_MAX_VOLUME = 0.3;
 const BIRD_AUDIO_ELEMENT_VOLUME = 1;
 const LOW_MEDIA_VOLUME_THRESHOLD = 0.32;
@@ -177,7 +175,6 @@ let endGameTimeout = null;
 let streakFeedbackTimeout = null;
 let currentControlMode = 'mouse';
 let audioContext = null;
-let openingAudio = null;
 let audioTipTimeout = null;
 let isAudioContextWatched = false;
 let deferredInstallPrompt = null;
@@ -1048,10 +1045,6 @@ function isAudioContextOffDuringPlay() {
 function hasLowOrMutedGameAudio() {
   const trackedAudio = [];
 
-  if (openingAudio) {
-    trackedAudio.push(openingAudio);
-  }
-
   birdCallNodes.forEach(({ audio }) => {
     trackedAudio.push(audio);
   });
@@ -1103,10 +1096,6 @@ function ensureMediaElementAudible(audio, recommendedVolume) {
 function ensureGameAudioLevels() {
   let adjusted = false;
 
-  if (openingAudio) {
-    adjusted = ensureMediaElementAudible(openingAudio, OPENING_AUDIO_VOLUME) || adjusted;
-  }
-
   birdCallNodes.forEach(({ audio }) => {
     adjusted = ensureMediaElementAudible(audio, BIRD_AUDIO_ELEMENT_VOLUME) || adjusted;
   });
@@ -1143,61 +1132,6 @@ function watchAudioContextState(context) {
 
   isAudioContextWatched = true;
   context.addEventListener('statechange', reconcileAudioTip);
-}
-
-function getOpeningAudio() {
-  if (!openingAudio) {
-    openingAudio = new Audio(gameStartAudioSrc);
-    openingAudio.loop = true;
-    openingAudio.preload = 'auto';
-    openingAudio.volume = OPENING_AUDIO_VOLUME;
-    trackGameAudioElement(openingAudio, OPENING_AUDIO_VOLUME);
-  }
-
-  return openingAudio;
-}
-
-function playOpeningAudio() {
-  const audio = getOpeningAudio();
-
-  ensureGameAudioLevels();
-
-  if (!audio.paused) {
-    reconcileAudioTip();
-    return;
-  }
-
-  const playPromise = audio.play();
-
-  if (playPromise) {
-    playPromise.then(reconcileAudioTip).catch(err => {
-      if (err.name !== 'NotAllowedError') {
-        console.log('Opening audio playback failed:', err);
-      }
-
-      showAudioTip(AUDIO_TIP_BLOCKED_MESSAGE, { persist: true });
-    });
-  }
-}
-
-function stopOpeningAudio() {
-  if (!openingAudio) {
-    return;
-  }
-
-  openingAudio.pause();
-
-  try {
-    openingAudio.currentTime = 0;
-  } catch {
-    // Some browsers defer seeking until metadata is available.
-  }
-}
-
-function resumeOpeningAudioIfVisible() {
-  if (startScreen.classList.contains('active') || videoScreen.classList.contains('active')) {
-    playOpeningAudio();
-  }
 }
 
 function getBirdCallHintDistance() {
@@ -1652,7 +1586,6 @@ function rectsOverlap(firstRect, secondRect) {
 
 function startGame() {
   requestPortableFullscreen();
-  playOpeningAudio();
   showAudioTip(AUDIO_TIP_REMINDER_MESSAGE);
   resetLeaderboardState();
 
@@ -1673,7 +1606,6 @@ function startGame() {
 }
 
 function showTutorial() {
-  stopOpeningAudio();
   videoScreen.classList.remove('active');
   tutorialModal.classList.remove('hidden');
   tutorialStartBtn.focus();
@@ -1749,7 +1681,6 @@ function quitToHome() {
   gameScreen.classList.remove('active');
   endScreen.classList.remove('active');
   startScreen.classList.add('active');
-  playOpeningAudio();
   loadGlobalHighScore();
 }
 
@@ -2166,8 +2097,6 @@ function handleAudioTipButtonClick() {
 
   if (isPlaying && !isPaused) {
     playActiveBirdCalls();
-  } else if (startScreen.classList.contains('active') || videoScreen.classList.contains('active')) {
-    playOpeningAudio();
   }
 
   showAudioTip(adjusted ? AUDIO_TIP_BOOSTED_MESSAGE : AUDIO_TIP_REMINDER_MESSAGE);
@@ -2263,8 +2192,6 @@ skipVideoBtn.addEventListener('click', () => {
 });
 tutorialStartBtn.addEventListener('click', startGameLogic);
 initializeFieldGuide(document, {
-  onOpen: stopOpeningAudio,
-  onClose: playOpeningAudio,
   callSources: birdCallSources,
 });
 identifyBtn.addEventListener('click', handleRegister);
@@ -2314,14 +2241,11 @@ gameContainer.addEventListener('pointerdown', handlePointerDown);
 gameContainer.addEventListener('pointermove', handlePointerMove);
 gameContainer.addEventListener('pointerup', handlePointerUp);
 gameContainer.addEventListener('pointercancel', handlePointerCancel);
-document.addEventListener('pointerdown', resumeOpeningAudioIfVisible, { capture: true });
-document.addEventListener('keydown', resumeOpeningAudioIfVisible);
 
 // Initial update
 registerAppServiceWorker();
 updateScoreboard();
 updateFlashlight(window.innerWidth / 2, window.innerHeight / 2);
-playOpeningAudio();
 loadGlobalHighScore();
 subscribeToLeaderboard(gameMode, handleLeaderboardRealtimeUpdate);
 window.addEventListener('beforeunload', unsubscribeFromLeaderboard);

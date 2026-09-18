@@ -2265,6 +2265,7 @@ tutorialStartBtn.addEventListener('click', startGameLogic);
 initializeFieldGuide(document, {
   onOpen: stopOpeningAudio,
   onClose: playOpeningAudio,
+  callSources: birdCallSources,
 });
 identifyBtn.addEventListener('click', handleRegister);
 audioTipButton.addEventListener('click', handleAudioTipButtonClick);

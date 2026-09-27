@@ -70,8 +70,13 @@ const endScoreSummary = document.getElementById('end-score-summary');
 const videoScreen = document.getElementById('video-screen');
 const transitionVideo = document.getElementById('transition-video');
 const skipVideoBtn = document.getElementById('skip-video-btn');
-const tutorialModal = document.getElementById('tutorial-modal');
-const tutorialStartBtn = document.getElementById('tutorial-start-btn');
+const tutorialCoach = document.getElementById('tutorial-coach');
+const tutorialCoachKicker = document.getElementById('tutorial-coach-kicker');
+const tutorialCoachTitle = document.getElementById('tutorial-coach-title');
+const tutorialCoachText = document.getElementById('tutorial-coach-text');
+const tutorialCoachProgress = document.getElementById('tutorial-coach-progress');
+const tutorialSkipBtn = document.getElementById('tutorial-skip-btn');
+const tutorialBeginBtn = document.getElementById('tutorial-begin-btn');
 const audioTip = document.getElementById('audio-tip');
 const audioTipButton = document.getElementById('audio-tip-button');
 const audioTipText = document.getElementById('audio-tip-text');
@@ -139,6 +144,10 @@ const BEAM_AUDIO_UPDATE_INTERVAL = 0.15;
 const CANDIDATE_REFRESH_MIN_MOVE_PX = 0.75;
 const SCORE_COUNT_UP_MS = 500;
 const WARM_TICK_FREQUENCY = 1200;
+const TUTORIAL_BIRD_ID = 'great_horned_owl';
+const TUTORIAL_BIRD_NAME = 'Great Horned Owl';
+const TUTORIAL_MOVE_THRESHOLD_PX = 90;
+const TUTORIAL_BIRD_POSITION = { top: 55, left: 65 };
 
 function getMovingBirdIds() {
   if (gameMode === 'expert') {
@@ -204,6 +213,10 @@ let scoreAnimFrame = null;
 let roundGuesses = 0;
 let roundBestStreak = 0;
 let isWarmHintShown = false;
+let isTutorialActive = false;
+let tutorialStep = 0;
+let tutorialMoveAccumPx = 0;
+let tutorialLastSpot = null;
 
 // Initialize birds info
 const birdIds = ['great_horned_owl', 'western_screech_owl', 'barn_owl', 'common_poorwill'];
@@ -1195,18 +1208,25 @@ function initializeBirdCallAudio() {
   return context;
 }
 
+function getTutorialEffectiveFoundBirds() {
+  return new Set(birdIds.filter(id => id !== TUTORIAL_BIRD_ID));
+}
+
 function updateBirdCallAudio() {
   if (!audioContext || birdCallNodes.size === 0) {
     return;
   }
 
   const hintDistance = getBirdCallHintDistance();
+  const effectiveFoundBirds = isTutorialActive
+    ? getTutorialEffectiveFoundBirds()
+    : foundBirds;
   const mixes = isPlaying && !isGuessing
     ? getDirectionalBirdCallMix(
       currentMouseX,
       currentMouseY,
       getMovingBirdsInfo(),
-      foundBirds,
+      effectiveFoundBirds,
       {
         maxDistance: hintDistance,
         maxVolume: BIRD_CALL_MAX_VOLUME,
@@ -1359,18 +1379,27 @@ function refreshBirdCandidate() {
     return;
   }
 
-  const birdsInfo = getMovingBirdsInfo();
+  const allBirdsInfo = getMovingBirdsInfo();
+  const effectiveFoundBirds = isTutorialActive
+    ? getTutorialEffectiveFoundBirds()
+    : foundBirds;
+  const birdsInfo = isTutorialActive
+    ? allBirdsInfo.filter(bird => bird.id === TUTORIAL_BIRD_ID)
+    : allBirdsInfo;
   const birdId = getBirdCandidateInBeam(
     currentMouseX,
     currentMouseY,
     birdsInfo,
     FLASHLIGHT_RADIUS,
-    foundBirds,
+    effectiveFoundBirds,
   );
 
   if (birdId) {
     setWarmHint(false);
     setBirdCandidate(birdId);
+    if (isTutorialActive) {
+      noteTutorialCandidateFound(birdId);
+    }
     return;
   }
 
@@ -1380,7 +1409,7 @@ function refreshBirdCandidate() {
     currentMouseX,
     currentMouseY,
     birdsInfo,
-    foundBirds,
+    effectiveFoundBirds,
   );
 
   setWarmHint(
@@ -1400,6 +1429,10 @@ function openGuessModal(birdId) {
   guessModal.classList.remove('hidden');
   guessFeedback.classList.add('hidden');
   updateBirdCallAudio();
+
+  if (isTutorialActive && tutorialStep === 2 && birdId === TUTORIAL_BIRD_ID) {
+    setTutorialStep(3);
+  }
 }
 
 function updateFlashlight(x, y, controlMode = currentControlMode) {
@@ -1417,6 +1450,10 @@ function updateFlashlight(x, y, controlMode = currentControlMode) {
   targetSpotY = positions.spotlightY;
   targetHandX = positions.handX;
   targetHandY = positions.handY;
+
+  if (isTutorialActive) {
+    noteTutorialBeamMove(targetSpotX, targetSpotY);
+  }
 
   if (!isPlaying) {
     snapBeamToTarget();
@@ -1592,27 +1629,230 @@ function startGame() {
   startScreen.classList.remove('active');
   endScreen.classList.remove('active');
   videoScreen.classList.add('active');
-  tutorialModal.classList.add('hidden');
 
   transitionVideo.currentTime = 0;
   transitionVideo.play().catch(err => {
     console.log('Video play failed, skipping to tutorial', err);
-    showTutorial();
+    startTutorial();
   });
-  
+
   transitionVideo.onended = () => {
-    showTutorial();
+    startTutorial();
   };
 }
 
-function showTutorial() {
+function isTouchTutorial() {
+  return navigator.maxTouchPoints > 0
+    || window.matchMedia(PORTABLE_FULLSCREEN_QUERY).matches;
+}
+
+function updateTutorialProgressDots(activeStep) {
+  if (!tutorialCoachProgress) {
+    return;
+  }
+
+  const dots = tutorialCoachProgress.querySelectorAll('.tutorial-dot');
+  dots.forEach((dot, index) => {
+    dot.classList.toggle('active', index === activeStep);
+    dot.classList.toggle('done', index < activeStep);
+  });
+}
+
+function setTutorialStep(step) {
+  tutorialStep = step;
+
+  if (!tutorialCoach) {
+    return;
+  }
+
+  tutorialCoach.classList.remove('hidden');
+  identifyBtn.classList.remove('tutorial-highlight-identify');
+  tutorialBeginBtn?.classList.add('hidden');
+  tutorialSkipBtn?.classList.remove('hidden');
+
+  const dragVerb = isTouchTutorial() ? 'Press and drag' : 'Move your mouse';
+
+  if (step === 0) {
+    tutorialCoachKicker.innerText = 'Practice • Step 1 of 3';
+    tutorialCoachTitle.innerText = 'Drag to sweep the dark';
+    tutorialCoachText.innerText = isTouchTutorial()
+      ? 'Press and drag to move the flashlight. Try big sweeps across the trees.'
+      : 'Move your mouse to sweep the flashlight beam across the trees. Try big sweeps.';
+    updateTutorialProgressDots(0);
+  } else if (step === 1) {
+    tutorialCoachKicker.innerText = 'Practice • Step 2 of 3';
+    tutorialCoachTitle.innerText = 'Catch the owl in your beam';
+    tutorialCoachText.innerText = 'Keep sweeping. The call gets louder as you get closer. When the owl lights up, hold steady.';
+    updateTutorialProgressDots(1);
+  } else if (step === 2) {
+    tutorialCoachKicker.innerText = 'Practice • Step 3 of 3';
+    tutorialCoachTitle.innerText = 'Spotlight on the owl? Identify it!';
+    tutorialCoachText.innerText = `${dragVerb === 'Press and drag' ? 'Hold the beam on the owl and tap Identify. Don\'t tap the owl itself — that moves the light away.' : 'Hold the beam on the owl and click Identify. Don\'t click the owl itself.'}`;
+    identifyBtn.classList.add('tutorial-highlight-identify');
+    updateTutorialProgressDots(2);
+  } else if (step === 3) {
+    tutorialCoachKicker.innerText = 'Practice • Name that owl';
+    tutorialCoachTitle.innerText = 'Which owl did you find?';
+    tutorialCoachText.innerText = `Tap ${TUTORIAL_BIRD_NAME} to log it. Practice has no timer and no penalty.`;
+    updateTutorialProgressDots(3);
+  } else if (step === 4) {
+    tutorialCoachKicker.innerText = 'Practice complete';
+    tutorialCoachTitle.innerText = 'Nice spotting!';
+    tutorialCoachText.innerText = 'You swept the beam, held it on the owl, and identified it. Ready for the real night patrol?';
+    updateTutorialProgressDots(3);
+    tutorialSkipBtn?.classList.add('hidden');
+    tutorialBeginBtn?.classList.remove('hidden');
+    tutorialBeginBtn?.focus?.();
+  }
+}
+
+function noteTutorialBeamMove(x, y) {
+  if (!isTutorialActive || tutorialStep !== 0) {
+    tutorialLastSpot = { x, y };
+    return;
+  }
+
+  if (tutorialLastSpot) {
+    const dx = x - tutorialLastSpot.x;
+    const dy = y - tutorialLastSpot.y;
+    tutorialMoveAccumPx += Math.hypot(dx, dy);
+  }
+
+  tutorialLastSpot = { x, y };
+
+  if (tutorialMoveAccumPx >= TUTORIAL_MOVE_THRESHOLD_PX) {
+    setTutorialStep(1);
+    refreshBirdCandidate();
+  }
+}
+
+function noteTutorialCandidateFound(birdId) {
+  if (!isTutorialActive || tutorialStep !== 1) {
+    return;
+  }
+
+  if (birdId === TUTORIAL_BIRD_ID) {
+    setTutorialStep(2);
+  }
+}
+
+function startTutorial() {
+  clearPendingEndGame();
+  cancelRoundCountdown();
+  if (gameInterval) clearInterval(gameInterval);
+  gameInterval = null;
+  stopMovingBirdAnimation();
+  stopLowBattery();
+
+  foundBirds.clear();
+  score = 0;
+  correctStreak = 0;
+  roundGuesses = 0;
+  roundBestStreak = 0;
+  displayedScore = 0;
+  updateScoreboard(true);
+  birdsFoundCountEl.innerText = '0';
+
+  isTutorialActive = true;
+  tutorialStep = 0;
+  tutorialMoveAccumPx = 0;
+  tutorialLastSpot = null;
+  isPlaying = true;
+  isCountingDown = false;
+  isPaused = false;
+  isGuessing = false;
+  currentBirdTarget = null;
+  currentBirdCandidate = null;
+  activePointerId = null;
+  pointerStartPosition = null;
+  currentControlMode = 'mouse';
+
+  pauseOverlay.classList.add('hidden');
+  guessModal.classList.add('hidden');
+  guessFeedback.classList.add('hidden');
+  clearStreakFeedback();
+  clearFloatPoints();
+  setBirdCandidate(null);
+  setWarmHint(false);
+  resetLeaderboardState();
+
+  birdIds.forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.remove('found');
+    el.classList.remove('missed');
+    el.classList.remove('sighted');
+    document.getElementById(`check-${id}`).classList.remove('found');
+    setBirdFlyingImage(id, false);
+    updateBirdFacing(id, 1);
+    if (id === TUTORIAL_BIRD_ID) {
+      el.style.display = '';
+      el.style.top = `${TUTORIAL_BIRD_POSITION.top}%`;
+      el.style.left = `${TUTORIAL_BIRD_POSITION.left}%`;
+    } else {
+      el.style.display = 'none';
+    }
+  });
+
+  startScreen.classList.remove('active');
+  endScreen.classList.remove('active');
   videoScreen.classList.remove('active');
-  tutorialModal.classList.remove('hidden');
-  tutorialStartBtn.focus();
+  gameScreen.classList.add('active');
+
+  timerEl.innerText = '∞';
+  timerEl.classList.remove('warn', 'danger');
+
+  const centerPoint = getGameViewportCenter();
+  targetSpotX = centerPoint.x;
+  targetSpotY = centerPoint.y;
+  renderedSpotX = targetSpotX;
+  renderedSpotY = targetSpotY;
+  tutorialLastSpot = { x: targetSpotX, y: targetSpotY };
+  updateFlashlight(centerPoint.x, centerPoint.y, 'mouse');
+  snapBeamToTarget();
+  tutorialLastSpot = { x: targetSpotX, y: targetSpotY };
+  tutorialMoveAccumPx = 0;
+
+  setTutorialStep(0);
+  startBirdCalls();
+  startMovingBirdAnimation();
+  showAudioTip(AUDIO_TIP_REMINDER_MESSAGE);
+  tutorialSkipBtn?.focus?.();
+}
+
+function cleanupTutorialState() {
+  isTutorialActive = false;
+  tutorialStep = 0;
+  tutorialMoveAccumPx = 0;
+  tutorialLastSpot = null;
+  tutorialCoach?.classList.add('hidden');
+  identifyBtn.classList.remove('tutorial-highlight-identify');
+  guessFeedback.innerText = 'Incorrect! -5 Seconds Penalty.';
+
+  birdIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.style.display = '';
+    }
+  });
+}
+
+function endTutorialToGame() {
+  if (!isTutorialActive) {
+    return;
+  }
+
+  pauseBirdCalls();
+  stopMovingBirdAnimation();
+  cleanupTutorialState();
+  startGameLogic();
+}
+
+function showTutorial() {
+  startTutorial();
 }
 
 function pauseGame() {
-  if (isPaused || isCountingDown) {
+  if (isPaused || isCountingDown || isTutorialActive) {
     return;
   }
 
@@ -1664,6 +1904,7 @@ function quitToHome() {
   clearInterval(gameInterval);
   gameInterval = null;
   stopMovingBirdAnimation();
+  cleanupTutorialState();
   setBirdCandidate(null);
   setWarmHint(false);
   clearStreakFeedback();
@@ -1722,7 +1963,9 @@ function startGameLogic() {
   pointerStartPosition = null;
   currentControlMode = 'mouse';
   resetLeaderboardState();
-  tutorialModal.classList.add('hidden');
+  pauseBirdCalls();
+  stopMovingBirdAnimation();
+  cleanupTutorialState();
   guessModal.classList.add('hidden');
   guessFeedback.classList.add('hidden');
   clearStreakFeedback();
@@ -1799,6 +2042,7 @@ function endGame(result) {
   clearInterval(gameInterval);
   gameInterval = null;
   stopMovingBirdAnimation();
+  cleanupTutorialState();
   setBirdCandidate(null);
   setWarmHint(false);
   clearStreakFeedback();
@@ -2103,9 +2347,34 @@ function handleAudioTipButtonClick() {
   reconcileAudioTip();
 }
 
+function handleTutorialGuess(guessedBird) {
+  if (guessedBird === TUTORIAL_BIRD_ID && currentBirdTarget === TUTORIAL_BIRD_ID) {
+    if (navigator.vibrate) navigator.vibrate(100);
+    isGuessing = false;
+    currentBirdTarget = null;
+    guessModal.classList.add('hidden');
+    guessFeedback.classList.add('hidden');
+    document.getElementById(TUTORIAL_BIRD_ID).classList.add('found');
+    updateBirdCallAudio();
+    setTutorialStep(4);
+    return true;
+  }
+
+  guessFeedback.innerText = `Not quite — look for the ${TUTORIAL_BIRD_NAME}. Try again.`;
+  guessFeedback.classList.remove('hidden');
+  if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+  return true;
+}
+
 guessBtns.forEach(btn => {
   btn.addEventListener('click', (e) => {
     const guessedBird = e.target.getAttribute('data-bird');
+
+    if (isTutorialActive) {
+      handleTutorialGuess(guessedBird);
+      return;
+    }
+
     roundGuesses += 1;
 
     if (guessedBird === currentBirdTarget) {
@@ -2190,7 +2459,8 @@ skipVideoBtn.addEventListener('click', () => {
   transitionVideo.pause();
   showTutorial();
 });
-tutorialStartBtn.addEventListener('click', startGameLogic);
+tutorialSkipBtn?.addEventListener('click', endTutorialToGame);
+tutorialBeginBtn?.addEventListener('click', endTutorialToGame);
 initializeFieldGuide(document, {
   callSources: birdCallSources,
 });

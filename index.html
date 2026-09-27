@@ -74,33 +74,10 @@
       <button id="skip-video-btn" class="skip-btn" type="button">Skip</button>
     </div>
 
-    <!-- Tutorial Modal -->
-    <div id="tutorial-modal" class="tutorial-modal hidden" role="dialog" aria-modal="true" aria-labelledby="tutorial-title">
-      <div class="tutorial-content">
-        <div class="tutorial-header-row">
-          <img src="/assets/tutorial_owl.png" alt="Cute scout owl" class="tutorial-owl-graphic" />
-          <div class="tutorial-header-text">
-            <p class="tutorial-kicker">Field Briefing</p>
-            <h2 id="tutorial-title">Night Spotter Protocol</h2>
-          </div>
-        </div>
-        <div class="tutorial-steps">
-          <div class="tutorial-step">
-            <span>1</span>
-            <p><strong>Sweep the Dark!</strong> Gently move your flashlight through the trees. Listen for faint calls to find hidden feathered targets.</p>
-          </div>
-          <div class="tutorial-step">
-            <span>2</span>
-            <p><strong>Target Locked!</strong> When a bird is caught inside your beam, hold steady and click the <strong>Identify</strong> button on your panel. On touch devices, always use the <strong>Identify</strong> button — don't tap the bird itself, or the flashlight will shift away.</p>
-          </div>
-          <div class="tutorial-step">
-            <span>3</span>
-            <p><strong>Watch the clock!</strong> Correctly guess the species to gain bonus points. Be careful: a wrong call startles the bird and costs you <strong>5 seconds</strong>!</p>
-          </div>
-        </div>
-        <button id="tutorial-start-btn" class="primary-btn" type="button">Begin Patrol</button>
-      </div>
-    </div>
+    <!-- Guided Tutorial Coach (replaces static rules modal) -->
+    <!-- Interactive practice runs on the game screen; this element is kept hidden
+         outside tutorial mode for backwards compatibility with older scripts. -->
+    <div id="tutorial-modal" class="hidden" aria-hidden="true"></div>
 
     <!-- Field Guide Modal -->
     <div id="field-guide-modal" class="field-guide-modal hidden" role="dialog" aria-modal="true" aria-labelledby="field-guide-title">
@@ -176,6 +153,24 @@
             <li id="check-barn_owl">Barn Owl</li>
             <li id="check-common_poorwill">Common Poorwill</li>
           </ul>
+        </div>
+      </div>
+
+      <!-- Guided tutorial coach -->
+      <div id="tutorial-coach" class="tutorial-coach hidden" aria-live="polite">
+        <div class="tutorial-coach-card">
+          <p id="tutorial-coach-kicker" class="tutorial-kicker">Practice • Step 1 of 3</p>
+          <h2 id="tutorial-coach-title">Drag to sweep the dark</h2>
+          <p id="tutorial-coach-text">Move to sweep your flashlight beam across the trees.</p>
+          <div id="tutorial-coach-progress" class="tutorial-coach-progress" aria-hidden="true">
+            <span class="tutorial-dot active"></span>
+            <span class="tutorial-dot"></span>
+            <span class="tutorial-dot"></span>
+          </div>
+          <div class="tutorial-coach-actions">
+            <button id="tutorial-skip-btn" class="tutorial-skip-btn" type="button">Skip tutorial</button>
+            <button id="tutorial-begin-btn" class="primary-btn hidden" type="button">Start patrol</button>
+          </div>
         </div>
       </div>
 

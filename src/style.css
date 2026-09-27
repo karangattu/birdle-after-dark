@@ -311,30 +311,33 @@ p {
   object-fit: cover;
 }
 
-/* Tutorial Modal */
-.tutorial-modal {
-  position: fixed;
-  top: 0;
+/* Guided tutorial coach */
+.tutorial-coach {
+  position: absolute;
+  top: max(74px, env(safe-area-inset-top));
   left: 0;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
+  right: 0;
+  z-index: 35;
   display: flex;
   justify-content: center;
-  align-items: center;
-  padding: 20px;
-  background: rgba(0, 0, 0, 0.82);
-  z-index: 60;
-  backdrop-filter: blur(8px);
+  padding: 0 16px;
+  pointer-events: none;
 }
 
-.tutorial-content {
+.tutorial-coach.hidden {
+  display: none;
+}
+
+.tutorial-coach-card {
   width: min(520px, 100%);
-  background: #151515;
-  border: 1px solid rgba(255,255,255,0.14);
-  border-radius: 12px;
-  padding: clamp(22px, 4vw, 34px);
-  box-shadow: 0 24px 70px rgba(0,0,0,0.65);
+  background: rgba(10, 10, 10, 0.88);
+  border: 1px solid rgba(255, 204, 0, 0.42);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  text-align: center;
+  pointer-events: auto;
 }
 
 .tutorial-kicker {
@@ -342,51 +345,85 @@ p {
   font-size: 0.75rem;
   font-weight: 900;
   letter-spacing: 0.12em;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   opacity: 1;
   text-transform: uppercase;
 }
 
-.tutorial-content h2 {
-  font-size: clamp(1.6rem, 4vw, 2.1rem);
-  margin-bottom: 20px;
+.tutorial-coach-card h2 {
+  font-size: clamp(1.15rem, 3.4vw, 1.5rem);
+  margin-bottom: 6px;
 }
 
-.tutorial-steps {
-  display: grid;
-  gap: 12px;
-  margin-bottom: 26px;
-}
-
-.tutorial-step {
-  display: grid;
-  grid-template-columns: 34px 1fr;
-  gap: 12px;
-  align-items: start;
-}
-
-.tutorial-step span {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: rgba(255,204,0,0.14);
-  border: 1px solid rgba(255,204,0,0.45);
-  color: var(--primary-color);
-  font-weight: 900;
-}
-
-.tutorial-step p {
-  margin: 5px 0 0;
-  font-size: 1rem;
+.tutorial-coach-card p {
+  margin-bottom: 10px;
+  font-size: 0.95rem;
   line-height: 1.45;
+  opacity: 0.9;
 }
 
-#tutorial-start-btn {
-  width: 100%;
-  border-radius: 12px;
+#tutorial-coach-text {
+  margin-bottom: 10px;
+}
+
+.tutorial-coach-progress {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tutorial-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.tutorial-dot.active {
+  background: var(--primary-color);
+  box-shadow: 0 0 8px rgba(255, 204, 0, 0.7);
+}
+
+.tutorial-dot.done {
+  background: rgba(255, 204, 0, 0.65);
+}
+
+.tutorial-coach-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.tutorial-skip-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.82);
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s;
+}
+
+.tutorial-skip-btn:hover,
+.tutorial-skip-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.4);
+  outline: none;
+}
+
+#tutorial-begin-btn {
+  padding: 10px 24px;
+  font-size: 1rem;
+}
+
+.tutorial-highlight-identify {
+  outline: 3px solid var(--primary-color);
+  outline-offset: 3px;
 }
 
 /* Field Guide */

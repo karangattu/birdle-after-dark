@@ -8,7 +8,7 @@
     "ecmaVersion": "latest",
     "sourceType": "module"
   },
-  "ignorePatterns": ["dist/*", "node_modules/*"],
+  "ignorePatterns": ["dist/*", "dev-dist/*", "android/*", "node_modules/*"],
   "rules": {
   }
 }

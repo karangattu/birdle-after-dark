@@ -1,0 +1,9 @@
+{
+  "appId": "com.birdle.afterdark",
+  "appName": "Birdle After Dark",
+  "webDir": "dist",
+  "backgroundColor": "#0a0a0a",
+  "android": {
+    "allowMixedContent": false
+  }
+}

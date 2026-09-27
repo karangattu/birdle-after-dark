@@ -9,3 +9,26 @@ A small owl-themed browser game.
 1. `npm install`
 2. `npm run dev`
 3. Open the displayed localhost URL.
+
+## Android APK (offline play)
+
+The game is wrapped with [Capacitor](https://capacitorjs.com/) so it can be
+installed as an Android app. All game assets are bundled inside the APK, so it
+plays fully offline (the online leaderboard just shows empty with no connection).
+
+- **APK location (after building):**
+  `android/app/build/outputs/apk/debug/app-debug.apk`
+  (build outputs are gitignored, so build it locally — see below)
+- **Build it:**
+  1. `npm install`
+  2. `npm run build && npx cap sync android`
+  3. `cd android && ./gradlew assembleDebug`
+  (Gradle needs Java 17–21, e.g. Android Studio's bundled runtime, plus the
+  Android SDK.)
+- **Install it:** `adb install android/app/build/outputs/apk/debug/app-debug.apk`,
+  or copy the APK to your phone and open it.
+- **Icons/splash:** generated from `resources/icon.png` (the owl game icon) via
+  `npx capacitor-assets generate --android --assetPath resources`.
+
+Note: this is a debug-signed APK for sideloading. A Play Store release needs a
+keystore-signed release build (`assembleRelease`/AAB).

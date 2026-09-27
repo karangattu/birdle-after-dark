@@ -2,7 +2,9 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  base: '/birdle-after-dark/',
+  // Relative base so the same build works on GitHub Pages (/birdle-after-dark/)
+  // and inside the Capacitor Android WebView (file://).
+  base: './',
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Birdle After Dark</string>
+    <string name="title_activity_main">Birdle After Dark</string>
+    <string name="package_name">com.birdle.afterdark</string>
+    <string name="custom_url_scheme">com.birdle.afterdark</string>
+</resources>

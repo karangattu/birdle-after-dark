@@ -5,5 +5,10 @@
   "backgroundColor": "#0a0a0a",
   "android": {
     "allowMixedContent": false
+  },
+  "plugins": {
+    "SystemBars": {
+      "hidden": true
+    }
   }
 }

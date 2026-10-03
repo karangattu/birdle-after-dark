@@ -4,6 +4,17 @@
   --primary-color: #ffcc00;
   --bg-color: #0a0a0a;
   --text-color: #ffffff;
+
+  /* Safe-area insets.
+     Capacitor's SystemBars plugin injects --safe-area-inset-* onto the document
+     element from the real Android window insets. Android WebView has no native
+     env() safe-area support, so env() alone always resolves to 0px there and the
+     HUD would sit under the Samsung navigation bar; env() is kept only as the
+     fallback for browsers that do report insets. */
+  --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
 }
 
 * {
@@ -46,10 +57,10 @@ body {
 
 .start-artwork {
   position: absolute;
-  top: max(10px, env(safe-area-inset-top));
-  right: max(10px, env(safe-area-inset-right));
-  bottom: max(10px, env(safe-area-inset-bottom));
-  left: max(10px, env(safe-area-inset-left));
+  top: max(10px, var(--safe-top));
+  right: max(10px, var(--safe-right));
+  bottom: max(10px, var(--safe-bottom));
+  left: max(10px, var(--safe-left));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -74,7 +85,10 @@ body {
 }
 
 .end-content {
-  width: min(440px, calc(100vw - 32px));
+  width: min(440px, calc(100vw - var(--safe-left) - var(--safe-right) - 32px));
+  max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .start-content {
@@ -128,8 +142,8 @@ p {
 
 .audio-tip {
   position: fixed;
-  left: max(16px, env(safe-area-inset-left));
-  bottom: max(88px, calc(env(safe-area-inset-bottom) + 18px));
+  left: max(16px, var(--safe-left));
+  bottom: max(88px, calc(var(--safe-bottom) + 18px));
   z-index: 90;
   display: flex;
   align-items: center;
@@ -214,8 +228,8 @@ p {
 
 .install-prompt {
   position: absolute;
-  left: max(16px, env(safe-area-inset-left));
-  bottom: max(16px, calc(env(safe-area-inset-bottom) + 16px));
+  left: max(16px, var(--safe-left));
+  bottom: max(16px, calc(var(--safe-bottom) + 16px));
   z-index: 4;
   display: grid;
   gap: 14px;
@@ -314,7 +328,7 @@ p {
 /* Guided tutorial coach */
 .tutorial-coach {
   position: absolute;
-  top: max(74px, env(safe-area-inset-top));
+  top: max(74px, var(--safe-top));
   left: 0;
   right: 0;
   z-index: 35;
@@ -702,9 +716,9 @@ p {
 /* HUD */
 #hud-top {
   position: absolute;
-  top: max(14px, env(safe-area-inset-top));
-  left: max(16px, env(safe-area-inset-left));
-  right: max(16px, env(safe-area-inset-right));
+  top: max(14px, var(--safe-top));
+  left: max(16px, var(--safe-left));
+  right: max(16px, var(--safe-right));
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -788,12 +802,12 @@ p {
 #hud-bottom {
   position: absolute;
   right: 0;
-  bottom: max(18px, env(safe-area-inset-bottom));
+  bottom: max(18px, var(--safe-bottom));
   left: 0;
   display: flex;
   justify-content: center;
   z-index: 25;
-  padding: 0 16px;
+  padding: 0 max(16px, calc(var(--safe-right) + 8px)) 0 max(16px, calc(var(--safe-left) + 8px));
   pointer-events: none;
 }
 
@@ -1337,7 +1351,7 @@ p {
 .skip-btn {
   position: absolute;
   bottom: 24px;
-  right: max(24px, env(safe-area-inset-right));
+  right: max(24px, var(--safe-right));
   z-index: 10;
   background: rgba(0, 0, 0, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.25);
@@ -1626,8 +1640,8 @@ p {
   }
 
   .audio-tip {
-    left: max(10px, env(safe-area-inset-left));
-    bottom: max(78px, calc(env(safe-area-inset-bottom) + 14px));
+    left: max(10px, var(--safe-left));
+    bottom: max(78px, calc(var(--safe-bottom) + 14px));
   }
 
   .audio-tip-button {
@@ -1656,9 +1670,9 @@ p {
   }
 
   #hud-top {
-    top: max(10px, env(safe-area-inset-top));
-    left: max(10px, env(safe-area-inset-left));
-    right: max(10px, env(safe-area-inset-right));
+    top: max(10px, var(--safe-top));
+    left: max(10px, var(--safe-left));
+    right: max(10px, var(--safe-right));
     gap: 10px;
   }
 
@@ -1705,11 +1719,11 @@ p {
 
 @media screen and (max-height: 500px) and (orientation: landscape) {
   #hud-top {
-    top: max(8px, env(safe-area-inset-top));
+    top: max(8px, var(--safe-top));
   }
 
   .audio-tip {
-    bottom: max(64px, calc(env(safe-area-inset-bottom) + 10px));
+    bottom: max(64px, calc(var(--safe-bottom) + 10px));
   }
 
   #great_horned_owl { width: 104px; }

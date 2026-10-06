@@ -27,6 +27,7 @@ import {
   writeInstallPromptDismissed,
 } from './installPrompt.js';
 import { initializeFieldGuide } from './fieldGuide.js';
+import { BIRD_CALL_MAX_VOLUME } from './birdAudio.js';
 import {
   fetchHighScore,
   fetchTopLeaderboard,
@@ -123,7 +124,6 @@ const PORTABLE_FULLSCREEN_QUERY = '(pointer: coarse), (any-pointer: coarse)';
 const BIRD_PLACEMENT_PADDING = 18;
 const BIRD_PLACEMENT_ATTEMPTS = 180;
 const BOTTOM_HUD_RESERVED_HEIGHT = 92;
-const BIRD_CALL_MAX_VOLUME = 0.3;
 const BIRD_AUDIO_ELEMENT_VOLUME = 1;
 const LOW_MEDIA_VOLUME_THRESHOLD = 0.32;
 const AUDIO_TIP_HIDE_DELAY_MS = 6500;

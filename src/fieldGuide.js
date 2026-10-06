@@ -1,4 +1,6 @@
-const IDLE_STATUS = 'Tap an owl to hear its call.';
+import { BIRD_CALL_MAX_VOLUME } from './birdAudio.js';
+
+const IDLE_STATUS = 'Tap a bird to hear its call.';
 
 export function initializeFieldGuide(document, { onOpen, onClose, callSources = {} } = {}) {
   const modal = document.getElementById('field-guide-modal');
@@ -8,6 +10,7 @@ export function initializeFieldGuide(document, { onOpen, onClose, callSources = 
 
   const calls = Array.from(modal.querySelectorAll('audio[data-bird]'));
   calls.forEach(audio => {
+    audio.volume = BIRD_CALL_MAX_VOLUME;
     if (callSources[audio.dataset.bird]) {
       audio.src = callSources[audio.dataset.bird];
     }
@@ -27,7 +30,9 @@ export function initializeFieldGuide(document, { onOpen, onClose, callSources = 
 
   function markActive(birdId) {
     hotspots.forEach(hotspot => {
-      hotspot.classList.toggle('active', hotspot.dataset.birdCall === birdId);
+      const active = hotspot.dataset.birdCall === birdId;
+      hotspot.classList.toggle('active', active);
+      hotspot.setAttribute('aria-pressed', String(active));
     });
   }
 

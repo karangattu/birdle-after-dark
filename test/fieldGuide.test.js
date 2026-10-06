@@ -35,17 +35,24 @@ function hotspot(document, birdId) {
 }
 
 describe('interactive field guide', () => {
-  it('shows one field guide image with a tap target for each owl', () => {
+  it('gives each bird its own illustrated, labeled sound button', () => {
     const { document } = new JSDOM(html).window;
-    const image = document.querySelector('#field-guide-modal img');
-    expect(image.getAttribute('src')).toMatch(/field_guide\.png$/);
-    expect(image.getAttribute('alt')).toBeTruthy();
-
     const targets = [...document.querySelectorAll('#field-guide-modal [data-bird-call]')];
     expect(targets).toHaveLength(4);
     for (const target of targets) {
+      expect(target.tagName).toBe('BUTTON');
+      expect(target.textContent).toContain(target.dataset.birdName);
+      expect(target.querySelector('img').getAttribute('src')).toBe(`/assets/${target.dataset.birdCall}.png`);
       expect(target.getAttribute('aria-label')).toBeTruthy();
       expect(document.querySelector(`#field-guide-modal audio[data-bird="${target.dataset.birdCall}"]`)).not.toBeNull();
+    }
+  });
+
+  it('plays every guide call at the same level as a nearby game bird', () => {
+    const { document, calls } = setupGuide();
+    for (const audio of calls) {
+      hotspot(document, audio.dataset.bird).click();
+      expect(audio.volume).toBe(0.3);
     }
   });
 
@@ -72,6 +79,7 @@ describe('interactive field guide', () => {
     expect(barnCall.play).toHaveBeenCalledOnce();
     expect(document.getElementById('field-guide-status').textContent).toMatch(/Barn Owl/);
     expect(hotspot(document, 'barn_owl').classList.contains('active')).toBe(true);
+    expect(hotspot(document, 'barn_owl').getAttribute('aria-pressed')).toBe('true');
   });
 
   it('stops the previous call when another owl is tapped', () => {
@@ -100,7 +108,7 @@ describe('interactive field guide', () => {
 
     expect(poorwillCall.pause).toHaveBeenCalledOnce();
     expect(poorwillCall.play).not.toHaveBeenCalled();
-    expect(document.getElementById('field-guide-status').textContent).toMatch(/Tap an owl/);
+    expect(document.getElementById('field-guide-status').textContent).toMatch(/Tap a bird/);
   });
 
   it.each(['button', 'backdrop', 'Escape'])('stops calls and restores focus when closed via %s', method => {

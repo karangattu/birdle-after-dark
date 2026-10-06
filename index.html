@@ -84,27 +84,48 @@
       <div class="field-guide-content">
         <div class="field-guide-header">
           <div class="field-guide-header-text">
-            <p class="field-guide-kicker">Know Your Birds</p>
+            <p class="field-guide-kicker">Notes from the night</p>
             <h2 id="field-guide-title">Field Guide</h2>
+            <p class="field-guide-intro">Four familiar voices, collected after dark.</p>
           </div>
           <button id="field-guide-close-btn" class="field-guide-close-btn" type="button" aria-label="Close field guide">&times;</button>
         </div>
-        <div class="field-guide-image-wrap field-guide-interactive">
-          <div class="field-guide-plate">
-            <img src="/assets/field_guide.png" alt="Field guide showing the Great Horned Owl, Barn Owl, Common Poorwill, and Western Screech Owl" />
-            <button type="button" class="field-guide-hotspot" data-bird-call="great_horned_owl" data-bird-name="Great Horned Owl" style="left: 0; top: 0; width: 50%; height: 50%;" aria-label="Play Great Horned Owl call"></button>
-            <button type="button" class="field-guide-hotspot" data-bird-call="barn_owl" data-bird-name="Barn Owl" style="left: 50%; top: 0; width: 50%; height: 50%;" aria-label="Play Barn Owl call"></button>
-            <button type="button" class="field-guide-hotspot" data-bird-call="common_poorwill" data-bird-name="Common Poorwill" style="left: 0; top: 50%; width: 50%; height: 50%;" aria-label="Play Common Poorwill call"></button>
-            <button type="button" class="field-guide-hotspot" data-bird-call="western_screech_owl" data-bird-name="Western Screech Owl" style="left: 50%; top: 50%; width: 50%; height: 50%;" aria-label="Play Western Screech Owl call"></button>
-          </div>
+        <div class="field-guide-scrapbook">
+          <button type="button" class="field-guide-hotspot" data-bird-call="great_horned_owl" data-bird-name="Great Horned Owl" aria-label="Play Great Horned Owl call" aria-pressed="false">
+            <span class="field-guide-photo"><span class="field-guide-number" aria-hidden="true">01</span><img src="/assets/great_horned_owl.png" alt="" /></span>
+            <span class="field-guide-bird-name">Great Horned Owl</span>
+            <span class="field-guide-scientific">Bubo virginianus</span>
+            <span class="field-guide-call-note">hoo-h’HOO-hoo-hoo</span>
+            <span class="field-guide-note">Deep, unhurried hoots. Listen for the low rhythm.</span>
+            <span class="field-guide-listen" aria-hidden="true"><span class="field-guide-play-icon">▶</span> Listen to the call</span>
+          </button>
+          <button type="button" class="field-guide-hotspot" data-bird-call="barn_owl" data-bird-name="Barn Owl" aria-label="Play Barn Owl call" aria-pressed="false">
+            <span class="field-guide-photo"><span class="field-guide-number" aria-hidden="true">02</span><img src="/assets/barn_owl.png" alt="" /></span>
+            <span class="field-guide-bird-name">Barn Owl</span>
+            <span class="field-guide-scientific">Tyto alba</span>
+            <span class="field-guide-call-note">hiss… shreeee!</span>
+            <span class="field-guide-note">A raspy hiss-shriek, no hoot at all.</span>
+            <span class="field-guide-listen" aria-hidden="true"><span class="field-guide-play-icon">▶</span> Listen to the call</span>
+          </button>
+          <button type="button" class="field-guide-hotspot" data-bird-call="common_poorwill" data-bird-name="Common Poorwill" aria-label="Play Common Poorwill call" aria-pressed="false">
+            <span class="field-guide-photo"><span class="field-guide-number" aria-hidden="true">03</span><img src="/assets/common_poorwill.png" alt="" /></span>
+            <span class="field-guide-bird-name">Common Poorwill</span>
+            <span class="field-guide-scientific">Phalaenoptilus nuttallii</span>
+            <span class="field-guide-call-note">poor-will-IP</span>
+            <span class="field-guide-note">A low whistle, repeated like a little refrain.</span>
+            <span class="field-guide-listen" aria-hidden="true"><span class="field-guide-play-icon">▶</span> Listen to the call</span>
+          </button>
+          <button type="button" class="field-guide-hotspot" data-bird-call="western_screech_owl" data-bird-name="Western Screech Owl" aria-label="Play Western Screech Owl call" aria-pressed="false">
+            <span class="field-guide-photo"><span class="field-guide-number" aria-hidden="true">04</span><img src="/assets/western_screech_owl.png" alt="" /></span>
+            <span class="field-guide-bird-name">Western Screech Owl</span>
+            <span class="field-guide-scientific">Megascops kennicottii</span>
+            <span class="field-guide-call-note">hoo · hoo · hoo-hoo-hoo</span>
+            <span class="field-guide-note">A bouncing rhythm that speeds into a trill.</span>
+            <span class="field-guide-listen" aria-hidden="true"><span class="field-guide-play-icon">▶</span> Listen to the call</span>
+          </button>
         </div>
-        <p id="field-guide-status" class="field-guide-status" aria-live="polite">Tap an owl to hear its call.</p>
-        <ul class="field-guide-legend">
-          <li><strong>Great Horned Owl</strong> — Deep hooting: hoo-h&#8217;HOO-hoo-hoo.</li>
-          <li><strong>Barn Owl</strong> — Raspy hiss-shriek, no hoot at all.</li>
-          <li><strong>Common Poorwill</strong> — Low repeated poor-will-IP whistle.</li>
-          <li><strong>Western Screech Owl</strong> — Accelerating bounce into a trill.</li>
-        </ul>
+        <p id="field-guide-status" class="field-guide-status" aria-live="polite">Tap a bird to hear its call.</p>
+        <p class="field-guide-footer">Night watch collection &nbsp; / &nbsp; Birdle After Dark</p>
         <div class="field-guide-calls" aria-hidden="true">
           <audio data-bird="great_horned_owl" preload="none"></audio>
           <audio data-bird="barn_owl" preload="none"></audio>

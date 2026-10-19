@@ -33,4 +33,7 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Lets the game know when the phone is offline so scores can be kept
+         on the device and uploaded once the connection is back. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 </manifest>

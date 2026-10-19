@@ -16,6 +16,19 @@ The game is wrapped with [Capacitor](https://capacitorjs.com/) so it can be
 installed as an Android app. All game assets are bundled inside the APK, so it
 plays fully offline (the online leaderboard just shows empty with no connection).
 
+### Offline behaviour
+
+- The game itself never needs a connection: sounds, video and images are part
+  of the APK.
+- Your personal best is kept on the device per game mode, so it is always shown
+  even without a connection.
+- Leaderboard scores you submit while offline are stored on the device and
+  uploaded automatically once the phone is back online (on the `online` event,
+  when the app comes back to the foreground, and every 30 seconds as a
+  fallback). The start screen shows how many scores are still waiting.
+- The last leaderboard that was downloaded is cached on the device, so the
+  standings stay readable while offline.
+
 - **Download:** publish a GitHub release and CI builds the APK and attaches it
   as `BirdleAfterDark-<version>.apk` to the release (takes a few minutes).
   Manual runs of the "Android APK" workflow also produce a downloadable

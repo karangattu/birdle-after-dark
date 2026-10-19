@@ -33,6 +33,9 @@ import {
   fetchTopLeaderboard,
   saveScore,
   isTopScore,
+  isOnline,
+  flushPendingScores,
+  getPendingScoreCount,
   subscribeToLeaderboard,
   unsubscribeFromLeaderboard,
 } from './leaderboard.js';
@@ -94,8 +97,10 @@ const streakFeedback = document.getElementById('streak-feedback');
 const streakFeedbackLabel = document.getElementById('streak-feedback-label');
 const streakFeedbackPoints = document.getElementById('streak-feedback-points');
 const startHighScore = document.getElementById('start-high-score');
+const offlineBadge = document.getElementById('offline-badge');
 const leaderboard = document.getElementById('leaderboard');
 const leaderboardList = document.getElementById('leaderboard-list');
+const leaderboardStatus = document.getElementById('leaderboard-status');
 const leaderboardNameForm = document.getElementById('leaderboard-name-form');
 const leaderboardNameInput = document.getElementById('leaderboard-name-input');
 const leaderboardSubmitBtn = document.getElementById('leaderboard-submit-btn');
@@ -148,6 +153,7 @@ const TUTORIAL_BIRD_ID = 'great_horned_owl';
 const TUTORIAL_BIRD_NAME = 'Great Horned Owl';
 const TUTORIAL_MOVE_THRESHOLD_PX = 90;
 const TUTORIAL_BIRD_POSITION = { top: 55, left: 65 };
+const PENDING_SCORE_FLUSH_INTERVAL_MS = 30 * 1000;
 
 function getMovingBirdIds() {
   if (gameMode === 'expert') {
@@ -190,6 +196,7 @@ let deferredInstallPrompt = null;
 let installPromptDismissed = readInstallPromptDismissed(getSafeStorage());
 let leaderboardSubmitted = false;
 let globalHighScore = 0;
+let syncMessage = '';
 let movingBirdsState = new Map();
 let animationFrameId = null;
 let lowBatteryActive = false;
@@ -248,6 +255,91 @@ function getSafeStorage() {
   } catch {
     return null;
   }
+}
+
+function isOffline() {
+  return !isOnline();
+}
+
+function readPendingScoreCount(mode = null) {
+  try {
+    return getPendingScoreCount(mode, { storage: getSafeStorage() });
+  } catch {
+    return 0;
+  }
+}
+
+function setLeaderboardStatus(message) {
+  if (!leaderboardStatus) {
+    return;
+  }
+
+  leaderboardStatus.innerText = message;
+  leaderboardStatus.classList.toggle('hidden', !message);
+}
+
+/**
+ * Tells the player that the app keeps working without a connection and shows
+ * how many scores are still waiting to be uploaded.
+ */
+function updateOfflineIndicator() {
+  if (!offlineBadge) {
+    return;
+  }
+
+  const offline = isOffline();
+  const pending = readPendingScoreCount();
+  const pendingLabel = pending === 1 ? '1 score' : `${pending} scores`;
+  let message = '';
+
+  if (offline) {
+    message = pending > 0
+      ? `Offline — ${pendingLabel} saved on this device, uploading when you are back online.`
+      : 'Offline — the game keeps working, scores are saved on this device.';
+  } else if (pending > 0) {
+    message = `${pendingLabel} waiting to upload.`;
+  }
+
+  offlineBadge.innerText = message;
+  offlineBadge.classList.toggle('hidden', !message);
+}
+
+/**
+ * Uploads the scores that were saved while offline.
+ */
+async function flushPendingScoresNow() {
+  const result = await flushPendingScores(null, { storage: getSafeStorage() });
+
+  if (result.uploaded > 0) {
+    const label = result.uploaded === 1 ? 'score' : 'scores';
+    syncMessage = `${result.uploaded} saved ${label} uploaded to the leaderboard.`;
+    setLeaderboardStatus(syncMessage);
+  }
+
+  updateOfflineIndicator();
+
+  return result;
+}
+
+async function handleConnectionRestored() {
+  updateOfflineIndicator();
+  const { uploaded } = await flushPendingScoresNow();
+  await loadGlobalHighScore();
+
+  if (!leaderboard.classList.contains('hidden')) {
+    const topData = await fetchTopLeaderboard(gameMode, { storage: getSafeStorage() });
+    renderLeaderboard(topData);
+
+    if (!uploaded) {
+      setLeaderboardStatus('');
+    }
+  }
+
+  subscribeToLeaderboard(gameMode, handleLeaderboardRealtimeUpdate);
+}
+
+function handleConnectionLost() {
+  updateOfflineIndicator();
 }
 
 function registerAppServiceWorker() {
@@ -654,14 +746,20 @@ function updateBirdImagesForMode() {
 
 async function loadGlobalHighScore() {
   try {
-    globalHighScore = await fetchHighScore(gameMode);
+    globalHighScore = await fetchHighScore(gameMode, { storage: getSafeStorage() });
   } catch {
     globalHighScore = 0;
   }
 
+  const localBest = readStoredHighScore();
+
   if (globalHighScore > 0) {
+    // The global best, downloaded now or taken from the offline cache.
     const modeLabel = gameMode === 'expert' ? 'Expert High Score' : 'High Score';
     startHighScore.innerHTML = `<span>${modeLabel} <strong>${formatScore(globalHighScore)}</strong></span>`;
+  } else if (localBest > 0) {
+    // No global score available, so show the best score kept on this device.
+    startHighScore.innerHTML = `<span>Your best <strong>${formatScore(localBest)}</strong></span>`;
   } else {
     startHighScore.innerHTML = '';
   }
@@ -706,18 +804,29 @@ async function handleScoreSubmission() {
   leaderboardSubmitBtn.disabled = true;
   leaderboardNameFeedback.classList.add('hidden');
 
-  const result = await saveScore(name, score, gameMode);
+  const result = await saveScore(name, score, gameMode, { storage: getSafeStorage() });
 
-  if (result) {
+  if (result.status === 'saved') {
     leaderboardSubmitted = true;
     leaderboardNameForm.classList.add('hidden');
-    const topData = await fetchTopLeaderboard(gameMode);
+    setLeaderboardStatus('');
+    const topData = await fetchTopLeaderboard(gameMode, { storage: getSafeStorage() });
     renderLeaderboard(topData);
-  } else {
-    leaderboardNameFeedback.classList.remove('hidden');
-    leaderboardNameFeedback.innerText = 'Failed to save. Try again.';
-    leaderboardSubmitBtn.disabled = false;
+    updateOfflineIndicator();
+    return;
   }
+
+  if (result.status === 'queued') {
+    leaderboardSubmitted = true;
+    leaderboardNameForm.classList.add('hidden');
+    setLeaderboardStatus('Saved on this device. It will be added to the leaderboard when you are back online.');
+    updateOfflineIndicator();
+    return;
+  }
+
+  leaderboardNameFeedback.classList.remove('hidden');
+  leaderboardNameFeedback.innerText = 'Failed to save. Try again.';
+  leaderboardSubmitBtn.disabled = false;
 }
 
 async function showEndLeaderboard() {
@@ -725,8 +834,14 @@ async function showEndLeaderboard() {
   leaderboardNameForm.classList.add('hidden');
   leaderboardNameFeedback.classList.add('hidden');
 
-  const topData = await fetchTopLeaderboard(gameMode);
+  const topData = await fetchTopLeaderboard(gameMode, { storage: getSafeStorage() });
   renderLeaderboard(topData);
+
+  if (isOffline()) {
+    setLeaderboardStatus('Offline — showing the last leaderboard saved on this device.');
+  } else {
+    setLeaderboardStatus(syncMessage);
+  }
 
   if (!leaderboardSubmitted && isTopScore(score, topData)) {
     leaderboardNameForm.classList.remove('hidden');
@@ -742,11 +857,13 @@ function resetLeaderboardState() {
   leaderboardNameForm.classList.add('hidden');
   leaderboardNameInput.value = '';
   leaderboardSubmitBtn.disabled = false;
+  syncMessage = '';
+  setLeaderboardStatus('');
 }
 
 async function handleLeaderboardRealtimeUpdate() {
   if (!leaderboard.classList.contains('hidden')) {
-    const topData = await fetchTopLeaderboard(gameMode);
+    const topData = await fetchTopLeaderboard(gameMode, { storage: getSafeStorage() });
     renderLeaderboard(topData);
   }
   await loadGlobalHighScore();
@@ -2480,6 +2597,12 @@ checklistToggle.addEventListener('click', () => {
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     pauseGame();
+    return;
+  }
+
+  // The app may have been in the background while the phone was offline.
+  if (isOnline() && readPendingScoreCount() > 0) {
+    flushPendingScoresNow();
   }
 });
 leaderboardNameInput.addEventListener('keydown', (e) => {
@@ -2516,6 +2639,15 @@ gameContainer.addEventListener('pointercancel', handlePointerCancel);
 registerAppServiceWorker();
 updateScoreboard();
 updateFlashlight(window.innerWidth / 2, window.innerHeight / 2);
+updateOfflineIndicator();
 loadGlobalHighScore();
 subscribeToLeaderboard(gameMode, handleLeaderboardRealtimeUpdate);
+flushPendingScoresNow();
+window.addEventListener('online', handleConnectionRestored);
+window.addEventListener('offline', handleConnectionLost);
+window.setInterval(() => {
+  if (isOnline() && readPendingScoreCount() > 0) {
+    flushPendingScoresNow();
+  }
+}, PENDING_SCORE_FLUSH_INTERVAL_MS);
 window.addEventListener('beforeunload', unsubscribeFromLeaderboard);

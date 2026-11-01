@@ -2,15 +2,17 @@ import { BATMAN_FRAME_OUTLINES, BATMAN_FRAME_ORDER } from './batmanFrames.js';
 
 const FRAME_CLIPS = BATMAN_FRAME_OUTLINES.map(outline => 'polygon(' + outline.split(' ').map(point => point.split(',').map(value => value + '%').join(' ')).join(',') + ')');
 const GRAPPLE_HANDS = [[50, 50], [50, 50], [50, 50], [77, 20], [75, 25], [80, 28], [82, 19], [82, 17], [77, 30], [50, 50], [66, 29], [76, 12]];
+const ACTOR_WIDTH = 180;
+const ACTOR_HEIGHT = 224;
 
 // Prefer the quietest available part of the trees; never cover the HUD.
-export function chooseCameoPosition(width, height, birds, reserved, size = 90) {
+export function chooseCameoPosition(width, height, birds, reserved, size = ACTOR_WIDTH) {
   let best = null;
   let bestDistance = -1;
   // Touch holds the hand roughly 195px below the beam.
   const maxPerchY = Math.min(height * 0.7, height - 200);
   for (let y = height * 0.3; y <= maxPerchY; y += 16) {
-    for (let x = size; x <= width - size; x += 16) {
+    for (let x = size / 2; x <= width - size / 2; x += 16) {
       const blocked = reserved.some(rect => x + size / 2 > rect.left
         && x - size / 2 < rect.right && y + size / 2 > rect.top
         && y - size / 2 < rect.bottom);
@@ -28,6 +30,9 @@ export function chooseCameoPosition(width, height, birds, reserved, size = 90) {
 export function createBatmanCameo(container, spriteUrl) {
   const actor = document.createElement('div');
   actor.className = 'batman-cameo';
+  actor.style.width = `${ACTOR_WIDTH}px`;
+  actor.style.height = `${ACTOR_HEIGHT}px`;
+  actor.style.margin = `${-ACTOR_HEIGHT / 2}px 0 0 ${-ACTOR_WIDTH / 2}px`;
   actor.style.backgroundImage = `url("${spriteUrl}")`;
   const perch = document.createElement('div');
   perch.className = 'batman-perch';
@@ -67,7 +72,7 @@ export function createBatmanCameo(container, spriteUrl) {
       actor.style.transform = '';
       showFrame(0);
       perch.style.left = `${origin.x}px`;
-      perch.style.top = `${origin.y + 26}px`;
+      perch.style.top = `${origin.y + ACTOR_HEIGHT * 0.21}px`;
     },
     update(delta, beamX, beamY, radius) {
       if (phase === 'gone') return;
@@ -98,8 +103,8 @@ export function createBatmanCameo(container, spriteUrl) {
       const x = anchorX + Math.sin(angle) * length;
       const y = anchorY + Math.cos(angle) * length;
       actor.style.transform = `translate(${x - origin.x}px, ${y - origin.y}px)`;
-      const handX = x + (GRAPPLE_HANDS[frame][0] / 100 - 0.5) * 90;
-      const handY = y + (GRAPPLE_HANDS[frame][1] / 100 - 0.5) * 112;
+      const handX = x + (GRAPPLE_HANDS[frame][0] / 100 - 0.5) * ACTOR_WIDTH;
+      const handY = y + (GRAPPLE_HANDS[frame][1] / 100 - 0.5) * ACTOR_HEIGHT;
       rope.style.left = `${anchorX}px`;
       rope.style.top = `${anchorY}px`;
       rope.style.height = `${Math.hypot(handX - anchorX, handY - anchorY)}px`;

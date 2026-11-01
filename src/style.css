@@ -745,6 +745,11 @@ p {
 #barn_owl {
   --sprite-frame-width: 110px;
   width: var(--sprite-frame-width);
+  /* Anchor the owl's body, rather than the transparent image corner. */
+  translate: -50% -40%;
+}
+#barn_owl.bird-sprite-flying {
+  translate: -50% -60%;
 }
 #common_poorwill {
   --sprite-frame-width: 80px;
@@ -1895,9 +1900,6 @@ p {
 }
 
 .batman-cameo {
-  width: 90px;
-  height: 112px;
-  margin: -56px 0 0 -45px;
   background-size: 400% 300%;
   background-repeat: no-repeat;
   background-position: left center;
@@ -1909,9 +1911,9 @@ p {
 }
 
 .batman-perch {
-  width: 112px;
+  width: 224px;
   height: 9px;
-  margin-left: -56px;
+  margin-left: -112px;
   background: #30291e;
   border-top: 2px solid #544630;
   border-radius: 75% 20% 60% 15%;

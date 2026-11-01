@@ -3,6 +3,18 @@ import { describe, it, expect } from 'vitest';
 import * as cameo from '../src/batmanCameo.js';
 
 describe('Batman cameo', () => {
+  it('keeps the grapple attached to the enlarged actor’s hand', () => {
+    const container = document.createElement('div');
+    const animation = cameo.createBatmanCameo(container, 'sprite.png');
+    animation.reset({ x: 200, y: 220 });
+    animation.update(0.45, 200, 220, 40);
+    const actor = container.querySelector('.batman-cameo');
+    const rope = container.querySelector('.batman-rope');
+    expect(parseFloat(actor.style.width)).toBeGreaterThanOrEqual(180);
+    // Frame 3's hand is at (77%, 20%) in a 180 × 224 cell.
+    expect(parseFloat(rope.style.height)).toBeCloseTo(Math.hypot(248.6 - 380, 152.8 + 120));
+  });
+
   it('chooses an on-screen perch clear of birds and the HUD', () => {
     const position = cameo.chooseCameoPosition(800, 500,
       [{ x: 170, y: 230 }, { x: 400, y: 300 }],
@@ -21,6 +33,13 @@ describe('Batman cameo', () => {
     const birds = Array.from({ length: 9 }, (_, index) => ({ x: 90 + index * 80, y: 100 }));
     const position = cameo.chooseCameoPosition(844, 390, birds, []);
     expect(position.y).toBeLessThanOrEqual(195);
+  });
+
+  it('still finds room for the larger cameo on a narrow phone', () => {
+    const position = cameo.chooseCameoPosition(320, 640, [], []);
+    expect(position).not.toBeNull();
+    expect(position.x).toBeGreaterThanOrEqual(90);
+    expect(position.x).toBeLessThanOrEqual(230);
   });
 
   it('plays all twelve supplied poses and restores the perched frame on reset', () => {

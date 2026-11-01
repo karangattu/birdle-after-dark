@@ -1,3 +1,5 @@
+import { chooseCameoPosition, createDuskCameo } from './duskCameo.js';
+import duskSpriteSrc from '../assets/dusk_cameo.png';
 import { registerSW } from 'virtual:pwa-register';
 import {
   calculateIdentificationScore,
@@ -58,6 +60,7 @@ const installPromptDismissBtn = document.getElementById('install-prompt-dismiss-
 const gameScreen = document.getElementById('game-screen');
 const endScreen = document.getElementById('end-screen');
 const gameContainer = document.getElementById('game-container');
+const duskCameo = createDuskCameo(gameContainer, duskSpriteSrc);
 const startBtn = document.getElementById('start-btn');
 const restartBtn = document.getElementById('restart-btn');
 const modeRegularBtn = document.getElementById('mode-regular-btn');
@@ -642,6 +645,10 @@ function startMovingBirdAnimation() {
       updateBirdCallAudio();
     }
 
+    if (!isTutorialActive && !isGuessing) {
+      const rect = gameContainer.getBoundingClientRect();
+      duskCameo.update(deltaTime, currentMouseX - rect.left, currentMouseY - rect.top, FLASHLIGHT_RADIUS);
+    }
     updateMovingBirds(deltaTime);
     checkMovingBirdDetection();
 
@@ -1854,6 +1861,7 @@ function noteTutorialCandidateFound(birdId) {
 }
 
 function startTutorial() {
+  duskCameo.hide();
   clearPendingEndGame();
   cancelRoundCountdown();
   if (gameInterval) clearInterval(gameInterval);
@@ -2007,6 +2015,7 @@ function resumeGame() {
 }
 
 function quitToHome() {
+  duskCameo.hide();
   cancelRoundCountdown();
   clearPendingEndGame();
   isPaused = false;
@@ -2119,6 +2128,17 @@ function startGameLogic() {
     updateBirdImagesForMode();
   }
 
+  const cameoRect = gameContainer.getBoundingClientRect();
+  duskCameo.reset(chooseCameoPosition(
+    cameoRect.width,
+    cameoRect.height,
+    getMovingBirdsInfo().map(bird => ({ x: bird.x - cameoRect.left, y: bird.y - cameoRect.top })),
+    getReservedBirdPlacementRects(cameoRect).map(rect => ({
+      left: rect.left - cameoRect.left, right: rect.right - cameoRect.left,
+      top: rect.top - cameoRect.top, bottom: rect.bottom - cameoRect.top,
+    })),
+  ));
+
   const centerPoint = getGameViewportCenter();
   updateFlashlight(centerPoint.x, centerPoint.y, 'mouse');
 
@@ -2145,6 +2165,7 @@ function revealMissedBirds() {
 }
 
 function endGame(result) {
+  duskCameo.hide();
   clearPendingEndGame();
   cancelRoundCountdown();
   isPaused = false;

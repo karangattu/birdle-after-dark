@@ -1885,3 +1885,62 @@ p {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.08); }
 }
+
+.dusk-cameo,
+.dusk-perch,
+.dusk-rope {
+  position: absolute;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.dusk-cameo {
+  width: 90px;
+  height: 90px;
+  margin: -45px 0 0 -45px;
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  background-position: left center;
+}
+
+.dusk-cameo[data-phase="firing"],
+.dusk-cameo[data-phase="swinging"] {
+  background-position: right center;
+  z-index: 6;
+}
+
+.dusk-perch {
+  width: 112px;
+  height: 9px;
+  margin-left: -56px;
+  background: #30291e;
+  border-top: 2px solid #544630;
+  border-radius: 75% 20% 60% 15%;
+  transform: rotate(-6deg);
+}
+
+.dusk-perch::after {
+  content: '';
+  position: absolute;
+  right: 9px;
+  top: -8px;
+  width: 22px;
+  height: 100vh;
+  border-radius: 40%;
+  background: #272319;
+  transform-origin: top;
+  transform: rotate(-2deg);
+}
+
+.dusk-rope {
+  width: 2px;
+  background: #a7aeb5;
+  transform-origin: top center;
+  z-index: 6;
+}
+
+.dusk-cameo[hidden],
+.dusk-perch[hidden],
+.dusk-rope[hidden] {
+  display: none;
+}

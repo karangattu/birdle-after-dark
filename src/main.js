@@ -1,5 +1,5 @@
 import { chooseCameoPosition, createBatmanCameo } from './batmanCameo.js';
-import batmanSpriteSrc from '../assets/batman_sprite_sheet.jpg';
+import batmanSpriteSrc from '../assets/batman_sprite_sheet.png';
 import { registerSW } from 'virtual:pwa-register';
 import {
   calculateIdentificationScore,

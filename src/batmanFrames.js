@@ -1,4 +1,4 @@
-// Silhouette masks crop the supplied JPG in the renderer without changing its artwork.
+// Silhouette masks crop the supplied PNG in the renderer without changing its artwork.
 // Coordinates are percentages within each of the sheet's 4 × 3 cells.
 export const BATMAN_FRAME_OUTLINES = [
   '68,18 70,23 71,27 73,29 72,35 70,39 73,48 71,54 70,58 73,65 72,68 66,69 62,67 62,61 58,61 55,68 45,70 33,71 27,71 25,69 21,71 20,57 18,50 17,46 20,43 22,36 23,32 31,28 39,26 50,24 59,26 63,27 65,24',

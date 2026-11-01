@@ -1,5 +1,5 @@
-import { chooseCameoPosition, createDuskCameo } from './duskCameo.js';
-import duskSpriteSrc from '../assets/dusk_cameo.png';
+import { chooseCameoPosition, createBatmanCameo } from './batmanCameo.js';
+import batmanSpriteSrc from '../assets/batman_sprite_sheet.jpg';
 import { registerSW } from 'virtual:pwa-register';
 import {
   calculateIdentificationScore,
@@ -60,7 +60,7 @@ const installPromptDismissBtn = document.getElementById('install-prompt-dismiss-
 const gameScreen = document.getElementById('game-screen');
 const endScreen = document.getElementById('end-screen');
 const gameContainer = document.getElementById('game-container');
-const duskCameo = createDuskCameo(gameContainer, duskSpriteSrc);
+const batmanCameo = createBatmanCameo(gameContainer, batmanSpriteSrc);
 const startBtn = document.getElementById('start-btn');
 const restartBtn = document.getElementById('restart-btn');
 const modeRegularBtn = document.getElementById('mode-regular-btn');
@@ -647,7 +647,7 @@ function startMovingBirdAnimation() {
 
     if (!isTutorialActive && !isGuessing) {
       const rect = gameContainer.getBoundingClientRect();
-      duskCameo.update(deltaTime, currentMouseX - rect.left, currentMouseY - rect.top, FLASHLIGHT_RADIUS);
+      batmanCameo.update(deltaTime, currentMouseX - rect.left, currentMouseY - rect.top, FLASHLIGHT_RADIUS);
     }
     updateMovingBirds(deltaTime);
     checkMovingBirdDetection();
@@ -1861,7 +1861,7 @@ function noteTutorialCandidateFound(birdId) {
 }
 
 function startTutorial() {
-  duskCameo.hide();
+  batmanCameo.hide();
   clearPendingEndGame();
   cancelRoundCountdown();
   if (gameInterval) clearInterval(gameInterval);
@@ -2015,7 +2015,7 @@ function resumeGame() {
 }
 
 function quitToHome() {
-  duskCameo.hide();
+  batmanCameo.hide();
   cancelRoundCountdown();
   clearPendingEndGame();
   isPaused = false;
@@ -2129,7 +2129,7 @@ function startGameLogic() {
   }
 
   const cameoRect = gameContainer.getBoundingClientRect();
-  duskCameo.reset(chooseCameoPosition(
+  batmanCameo.reset(chooseCameoPosition(
     cameoRect.width,
     cameoRect.height,
     getMovingBirdsInfo().map(bird => ({ x: bird.x - cameoRect.left, y: bird.y - cameoRect.top })),
@@ -2165,7 +2165,7 @@ function revealMissedBirds() {
 }
 
 function endGame(result) {
-  duskCameo.hide();
+  batmanCameo.hide();
   clearPendingEndGame();
   cancelRoundCountdown();
   isPaused = false;

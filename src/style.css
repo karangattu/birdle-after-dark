@@ -1886,30 +1886,29 @@ p {
   50% { transform: scale(1.08); }
 }
 
-.dusk-cameo,
-.dusk-perch,
-.dusk-rope {
+.batman-cameo,
+.batman-perch,
+.batman-rope {
   position: absolute;
   pointer-events: none;
   z-index: 2;
 }
 
-.dusk-cameo {
+.batman-cameo {
   width: 90px;
-  height: 90px;
-  margin: -45px 0 0 -45px;
-  background-size: 200% 100%;
+  height: 112px;
+  margin: -56px 0 0 -45px;
+  background-size: 400% 300%;
   background-repeat: no-repeat;
   background-position: left center;
 }
 
-.dusk-cameo[data-phase="firing"],
-.dusk-cameo[data-phase="swinging"] {
-  background-position: right center;
+.batman-cameo[data-phase="firing"],
+.batman-cameo[data-phase="swinging"] {
   z-index: 6;
 }
 
-.dusk-perch {
+.batman-perch {
   width: 112px;
   height: 9px;
   margin-left: -56px;
@@ -1919,7 +1918,7 @@ p {
   transform: rotate(-6deg);
 }
 
-.dusk-perch::after {
+.batman-perch::after {
   content: '';
   position: absolute;
   right: 9px;
@@ -1932,15 +1931,15 @@ p {
   transform: rotate(-2deg);
 }
 
-.dusk-rope {
+.batman-rope {
   width: 2px;
   background: #a7aeb5;
   transform-origin: top center;
   z-index: 6;
 }
 
-.dusk-cameo[hidden],
-.dusk-perch[hidden],
-.dusk-rope[hidden] {
+.batman-cameo[hidden],
+.batman-perch[hidden],
+.batman-rope[hidden] {
   display: none;
 }

@@ -1,3 +1,8 @@
+import { BATMAN_FRAME_OUTLINES, BATMAN_FRAME_ORDER } from './batmanFrames.js';
+
+const FRAME_CLIPS = BATMAN_FRAME_OUTLINES.map(outline => 'polygon(' + outline.split(' ').map(point => point.split(',').map(value => value + '%').join(' ')).join(',') + ')');
+const GRAPPLE_HANDS = [[50, 50], [50, 50], [50, 50], [77, 20], [75, 25], [80, 28], [82, 19], [82, 17], [77, 30], [50, 50], [66, 29], [76, 12]];
+
 // Prefer the quietest available part of the trees; never cover the HUD.
 export function chooseCameoPosition(width, height, birds, reserved, size = 90) {
   let best = null;
@@ -20,17 +25,21 @@ export function chooseCameoPosition(width, height, birds, reserved, size = 90) {
   return best;
 }
 
-export function createDuskCameo(container, spriteUrl) {
+export function createBatmanCameo(container, spriteUrl) {
   const actor = document.createElement('div');
-  actor.className = 'dusk-cameo';
+  actor.className = 'batman-cameo';
   actor.style.backgroundImage = `url("${spriteUrl}")`;
   const perch = document.createElement('div');
-  perch.className = 'dusk-perch';
+  perch.className = 'batman-perch';
   const rope = document.createElement('div');
-  rope.className = 'dusk-rope';
+  rope.className = 'batman-rope';
   for (const element of [perch, rope, actor]) {
     element.setAttribute('aria-hidden', 'true');
     container.append(element);
+  }
+  function showFrame(frame) {
+    actor.style.backgroundPosition = ((frame % 4) / 3 * 100) + '% ' + (Math.floor(frame / 4) * 50) + '%';
+    actor.style.clipPath = FRAME_CLIPS[frame];
   }
   let origin = null;
   let elapsed = 0;
@@ -56,6 +65,7 @@ export function createDuskCameo(container, spriteUrl) {
       actor.style.left = `${origin.x}px`;
       actor.style.top = `${origin.y}px`;
       actor.style.transform = '';
+      showFrame(0);
       perch.style.left = `${origin.x}px`;
       perch.style.top = `${origin.y + 26}px`;
     },
@@ -64,11 +74,15 @@ export function createDuskCameo(container, spriteUrl) {
       if (phase === 'perched') {
         if (Math.hypot(beamX - origin.x, beamY - origin.y) > radius) return;
         phase = 'firing';
-        rope.hidden = false;
+        rope.hidden = true;
       }
       elapsed += delta;
-      const progress = Math.min(1, Math.max(0, (elapsed - 0.28) / 1.35));
-      if (elapsed >= 0.28) phase = 'swinging';
+      const frameIndex = Math.min(11, Math.floor((elapsed + 0.00001) / 0.15));
+      const frame = BATMAN_FRAME_ORDER[frameIndex];
+      showFrame(frame);
+      const progress = Math.min(1, Math.max(0, (elapsed - 0.6) / 1.65));
+      if (elapsed >= 0.6) phase = 'swinging';
+      rope.hidden = elapsed < 0.45 || frameIndex === 11;
       actor.dataset.phase = phase;
       if (progress === 1) {
         actor.hidden = rope.hidden = true;
@@ -83,13 +97,13 @@ export function createDuskCameo(container, spriteUrl) {
       const angle = startAngle + (1.7 - startAngle) * progress * progress;
       const x = anchorX + Math.sin(angle) * length;
       const y = anchorY + Math.cos(angle) * length;
-      actor.style.transform = `translate(${x - origin.x}px, ${y - origin.y}px) rotate(${-progress * 35}deg)`;
-      const handX = x + 22;
-      const handY = y - 25;
+      actor.style.transform = `translate(${x - origin.x}px, ${y - origin.y}px)`;
+      const handX = x + (GRAPPLE_HANDS[frame][0] / 100 - 0.5) * 90;
+      const handY = y + (GRAPPLE_HANDS[frame][1] / 100 - 0.5) * 112;
       rope.style.left = `${anchorX}px`;
       rope.style.top = `${anchorY}px`;
       rope.style.height = `${Math.hypot(handX - anchorX, handY - anchorY)}px`;
-      rope.style.transform = `rotate(${Math.atan2(-(handX - anchorX), handY - anchorY)}rad) scaleY(${Math.min(1, elapsed / 0.16)})`;
+      rope.style.transform = `rotate(${Math.atan2(-(handX - anchorX), handY - anchorY)}rad) scaleY(${Math.min(1, Math.max(0, elapsed - 0.45) / 0.15)})`;
     },
   };
 }

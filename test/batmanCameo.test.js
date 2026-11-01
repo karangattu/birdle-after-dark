@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
-import * as cameo from '../src/duskCameo.js';
+import * as cameo from '../src/batmanCameo.js';
 
-describe('Dusk Ranger cameo', () => {
+describe('Batman cameo', () => {
   it('chooses an on-screen perch clear of birds and the HUD', () => {
     const position = cameo.chooseCameoPosition(800, 500,
       [{ x: 170, y: 230 }, { x: 400, y: 300 }],
@@ -23,28 +23,48 @@ describe('Dusk Ranger cameo', () => {
     expect(position.y).toBeLessThanOrEqual(195);
   });
 
+  it('plays all twelve supplied poses and restores the perched frame on reset', () => {
+    const container = document.createElement('div');
+    const animation = cameo.createBatmanCameo(container, 'sprite.jpg');
+    const actor = container.querySelector('.batman-cameo');
+    animation.reset({ x: 200, y: 220 });
+    const perchedPosition = actor.style.backgroundPosition;
+    const frames = new Set([perchedPosition]);
+    expect(perchedPosition).toBe('0% 0%');
+    for (let index = 0; index < 11; index++) {
+      animation.update(0.15, 200, 220, 40);
+      frames.add(actor.style.backgroundPosition);
+    }
+    expect(frames.size).toBe(12);
+    expect(actor.hidden).toBe(false);
+    animation.update(1, 500, 400, 40);
+    expect(actor.hidden).toBe(true);
+    animation.reset({ x: 300, y: 200 });
+    expect(actor.style.backgroundPosition).toBe(perchedPosition);
+  });
+
   it('waits for the beam, fires, swings away once, and resets for a new round', () => {
     const container = document.createElement('div');
-    const dusk = cameo.createDuskCameo(container, 'sprite.png');
-    const actor = container.querySelector('.dusk-cameo');
-    dusk.reset({ x: 200, y: 220 });
-    dusk.update(0.1, 500, 400, 40);
+    const batman = cameo.createBatmanCameo(container, 'sprite.png');
+    const actor = container.querySelector('.batman-cameo');
+    batman.reset({ x: 200, y: 220 });
+    batman.update(0.1, 500, 400, 40);
     expect(actor.dataset.phase).toBe('perched');
-    dusk.update(0.1, 200, 220, 40);
+    batman.update(0.1, 200, 220, 40);
     expect(actor.dataset.phase).toBe('firing');
-    expect(container.querySelector('.dusk-rope').hidden).toBe(false);
-    dusk.update(0.3, 500, 400, 40);
+    expect(container.querySelector('.batman-rope').hidden).toBe(true);
+    batman.update(0.6, 500, 400, 40);
     expect(actor.dataset.phase).toBe('swinging');
     expect(actor.style.transform).not.toBe('');
-    dusk.update(2, 200, 220, 40);
+    batman.update(2, 200, 220, 40);
     expect(actor.hidden).toBe(true);
-    dusk.update(1, 200, 220, 40);
+    batman.update(1, 200, 220, 40);
     expect(actor.hidden).toBe(true);
-    dusk.reset({ x: 300, y: 250 });
+    batman.reset({ x: 300, y: 250 });
     expect(actor.hidden).toBe(false);
     expect(actor.dataset.phase).toBe('perched');
-    dusk.hide();
+    batman.hide();
     expect(actor.hidden).toBe(true);
-    expect(container.querySelector('.dusk-perch').hidden).toBe(true);
+    expect(container.querySelector('.batman-perch').hidden).toBe(true);
   });
 });

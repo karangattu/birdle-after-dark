@@ -33,6 +33,7 @@ import { BIRD_CALL_MAX_VOLUME } from './birdAudio.js';
 import {
   fetchHighScore,
   fetchTopLeaderboard,
+  getOfflineLeaderboard,
   saveScore,
   isTopScore,
   isOnline,
@@ -198,6 +199,7 @@ let isAudioContextWatched = false;
 let deferredInstallPrompt = null;
 let installPromptDismissed = readInstallPromptDismissed(getSafeStorage());
 let leaderboardSubmitted = false;
+let leaderboardOffline = false;
 let globalHighScore = 0;
 let syncMessage = '';
 let movingBirdsState = new Map();
@@ -326,16 +328,11 @@ async function flushPendingScoresNow() {
 
 async function handleConnectionRestored() {
   updateOfflineIndicator();
-  const { uploaded } = await flushPendingScoresNow();
+  await flushPendingScoresNow();
   await loadGlobalHighScore();
 
   if (!leaderboard.classList.contains('hidden')) {
-    const topData = await fetchTopLeaderboard(gameMode, { storage: getSafeStorage() });
-    renderLeaderboard(topData);
-
-    if (!uploaded) {
-      setLeaderboardStatus('');
-    }
+    await refreshEndLeaderboard();
   }
 
   subscribeToLeaderboard(gameMode, handleLeaderboardRealtimeUpdate);
@@ -343,6 +340,9 @@ async function handleConnectionRestored() {
 
 function handleConnectionLost() {
   updateOfflineIndicator();
+  if (!leaderboard.classList.contains('hidden')) {
+    renderEndLeaderboard(getOfflineLeaderboard(gameMode, getSafeStorage()));
+  }
 }
 
 function registerAppServiceWorker() {
@@ -800,6 +800,8 @@ function escapeHtml(text) {
 }
 
 async function handleScoreSubmission() {
+  if (leaderboardSubmitBtn.disabled) return;
+
   const name = leaderboardNameInput.value.trim();
   if (!name) {
     leaderboardNameFeedback.classList.remove('hidden');
@@ -811,14 +813,13 @@ async function handleScoreSubmission() {
   leaderboardSubmitBtn.disabled = true;
   leaderboardNameFeedback.classList.add('hidden');
 
-  const result = await saveScore(name, score, gameMode, { storage: getSafeStorage() });
+  const storage = getSafeStorage();
+  const result = await saveScore(name, score, gameMode, { storage, deferUpload: leaderboardOffline });
 
   if (result.status === 'saved') {
     leaderboardSubmitted = true;
     leaderboardNameForm.classList.add('hidden');
-    setLeaderboardStatus('');
-    const topData = await fetchTopLeaderboard(gameMode, { storage: getSafeStorage() });
-    renderLeaderboard(topData);
+    await refreshEndLeaderboard();
     updateOfflineIndicator();
     return;
   }
@@ -826,7 +827,8 @@ async function handleScoreSubmission() {
   if (result.status === 'queued') {
     leaderboardSubmitted = true;
     leaderboardNameForm.classList.add('hidden');
-    setLeaderboardStatus('Saved on this device. It will be added to the leaderboard when you are back online.');
+    renderLeaderboard(getOfflineLeaderboard(gameMode, storage).entries);
+    setLeaderboardStatus('Saved on this device. Waiting to upload to the leaderboard.');
     updateOfflineIndicator();
     return;
   }
@@ -836,30 +838,34 @@ async function handleScoreSubmission() {
   leaderboardSubmitBtn.disabled = false;
 }
 
-async function showEndLeaderboard() {
-  leaderboard.classList.remove('hidden');
-  leaderboardNameForm.classList.add('hidden');
-  leaderboardNameFeedback.classList.add('hidden');
-
-  const topData = await fetchTopLeaderboard(gameMode, { storage: getSafeStorage() });
-  renderLeaderboard(topData);
-
-  if (isOffline()) {
-    setLeaderboardStatus('Offline — showing the last leaderboard saved on this device.');
-  } else {
-    setLeaderboardStatus(syncMessage);
-  }
-
-  if (!leaderboardSubmitted && isTopScore(score, topData)) {
+function renderEndLeaderboard({ entries, offline }) {
+  leaderboardOffline = offline;
+  renderLeaderboard(entries);
+  setLeaderboardStatus(offline ? 'Online leaderboard unavailable. You can still save scores on this device.' : syncMessage);
+  if (!leaderboardSubmitted && (offline || isTopScore(score, entries))
+      && leaderboardNameForm.classList.contains('hidden')) {
     leaderboardNameForm.classList.remove('hidden');
-    leaderboardNameInput.value = '';
-    leaderboardSubmitBtn.disabled = false;
     leaderboardNameInput.focus();
   }
 }
 
+async function refreshEndLeaderboard() {
+  const storage = getSafeStorage();
+  const result = await fetchTopLeaderboard(gameMode, { storage });
+  if (!leaderboard.classList.contains('hidden')) {
+    renderEndLeaderboard(isOffline() ? getOfflineLeaderboard(gameMode, storage) : result);
+  }
+}
+
+function showEndLeaderboard() {
+  leaderboard.classList.remove('hidden');
+  leaderboardNameFeedback.classList.add('hidden');
+  return refreshEndLeaderboard();
+}
+
 function resetLeaderboardState() {
   leaderboardSubmitted = false;
+  leaderboardOffline = false;
   leaderboard.classList.add('hidden');
   leaderboardNameForm.classList.add('hidden');
   leaderboardNameInput.value = '';
@@ -870,8 +876,7 @@ function resetLeaderboardState() {
 
 async function handleLeaderboardRealtimeUpdate() {
   if (!leaderboard.classList.contains('hidden')) {
-    const topData = await fetchTopLeaderboard(gameMode, { storage: getSafeStorage() });
-    renderLeaderboard(topData);
+    await refreshEndLeaderboard();
   }
   await loadGlobalHighScore();
 }

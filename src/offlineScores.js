@@ -101,16 +101,15 @@ export function readPendingScores(storage = getDefaultStorage()) {
 
 export function writePendingScores(storage = getDefaultStorage(), entries = []) {
   if (!storage?.setItem) {
-    return [];
+    return false;
   }
 
   try {
     storage.setItem(PENDING_SCORES_STORAGE_KEY, JSON.stringify(entries));
+    return true;
   } catch {
-    // Ignore storage failures so the game stays playable in restricted modes.
+    return false;
   }
-
-  return entries;
 }
 
 /**
@@ -124,7 +123,7 @@ export function queuePendingScore(storage = getDefaultStorage(), entry = {}) {
   const gameMode = entry.gameMode;
 
   if (!name || !isValidGameMode(gameMode)) {
-    return pending;
+    return false;
   }
 
   const existingIndex = pending.findIndex(
@@ -133,7 +132,7 @@ export function queuePendingScore(storage = getDefaultStorage(), entry = {}) {
 
   if (existingIndex >= 0) {
     if (pending[existingIndex].score >= score) {
-      return pending;
+      return true;
     }
 
     pending[existingIndex] = {
@@ -151,16 +150,13 @@ export function queuePendingScore(storage = getDefaultStorage(), entry = {}) {
     });
   }
 
-  const capped = pending.slice(-MAX_PENDING_SCORES);
-  writePendingScores(storage, capped);
-
-  return capped;
+  return writePendingScores(storage, pending.slice(-MAX_PENDING_SCORES));
 }
 
-export function removePendingScore(storage = getDefaultStorage(), { name, gameMode } = {}) {
+export function removePendingScore(storage = getDefaultStorage(), { name, gameMode, score }) {
   const targetName = normalizeName(name);
   const remaining = readPendingScores(storage).filter(
-    (queued) => !(queued.name === targetName && queued.gameMode === gameMode),
+    (queued) => !(queued.name === targetName && queued.gameMode === gameMode && queued.score <= score),
   );
 
   writePendingScores(storage, remaining);

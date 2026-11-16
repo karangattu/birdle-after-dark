@@ -39,6 +39,7 @@ function createQueryChain(result) {
     select: () => chain,
     eq: () => chain,
     order: () => chain,
+    abortSignal: () => chain,
     limit: () => Promise.resolve(result),
     single: () => Promise.resolve(result),
     then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
@@ -114,6 +115,26 @@ describe('leaderboard offline behaviour', () => {
       expect(readPendingScores(storage)).toHaveLength(1);
     });
 
+    it('should save locally when the leaderboard is unavailable even if the device reports online', async () => {
+      const result = await saveScore('Night Owl', 35, 'regular', { storage, deferUpload: true });
+
+      expect(result.status).toBe('queued');
+      expect(readPendingScores(storage)).toEqual([
+        expect.objectContaining({ name: 'Night Owl', score: 35, gameMode: 'regular' }),
+      ]);
+      expect(mockSupabase.from).not.toHaveBeenCalled();
+    });
+
+    it('should not confirm a local save when storage rejects the write', async () => {
+      setOnline(false);
+      storage.setItem = () => { throw new Error('Storage full'); };
+
+      const result = await saveScore('Night Owl', 35, 'regular', { storage });
+
+      expect(result.status).toBe('error');
+      expect(readPendingScores(storage)).toEqual([]);
+    });
+
     it('should reject a score without a name', async () => {
       const result = await saveScore('   ', 10, 'regular', { storage });
 
@@ -176,6 +197,22 @@ describe('leaderboard offline behaviour', () => {
       expect(readPendingScores(storage)).toHaveLength(1);
     });
 
+    it('should keep a better score saved during an upload queued', async () => {
+      await saveScore('Night Owl', 35, 'regular', { storage, deferUpload: true });
+      let finishUpload;
+      const response = new Promise(resolve => { finishUpload = resolve; });
+      mockSupabase.from.mockReturnValue({ insert: () => response });
+
+      const upload = flushPendingScores(null, { storage });
+      await saveScore('Night Owl', 70, 'regular', { storage, deferUpload: true });
+      finishUpload({ data: null, error: null });
+      await upload;
+
+      expect(readPendingScores(storage)).toEqual([
+        expect.objectContaining({ name: 'Night Owl', score: 70, gameMode: 'regular' }),
+      ]);
+    });
+
     it('should do nothing while offline', async () => {
       setOnline(false);
       mockSupabase.from.mockReturnValue({ insert: vi.fn() });
@@ -189,6 +226,27 @@ describe('leaderboard offline behaviour', () => {
   });
 
   describe('leaderboard cache', () => {
+    it('should show scores from this device offline even when the cached global top five is full', async () => {
+      mockSupabase.from.mockReturnValue({
+        select: () => createQueryChain({
+          data: [100, 90, 80, 70, 60].map(score => ({ name: `Player ${score}`, score })),
+          error: null,
+        }),
+      });
+      await fetchTopLeaderboard('regular', { storage });
+
+      setOnline(false);
+      mockSupabase.from.mockClear();
+      await saveScore('Local Owl', 35, 'regular', { storage });
+      await saveScore('Expert Owl', 45, 'expert', { storage });
+
+      expect(await fetchTopLeaderboard('regular', { storage })).toEqual({
+        entries: [{ name: 'Local Owl', score: 35 }],
+        offline: true,
+      });
+      expect(mockSupabase.from).not.toHaveBeenCalled();
+    });
+
     it('should cache the leaderboard after a successful fetch', async () => {
       mockSupabase.from.mockReturnValue({
         select: () => createQueryChain({
@@ -199,7 +257,8 @@ describe('leaderboard offline behaviour', () => {
 
       const top = await fetchTopLeaderboard('regular', { storage });
 
-      expect(top).toEqual([
+      expect(top.offline).toBe(false);
+      expect(top.entries).toEqual([
         { name: 'A', score: 30 },
         { name: 'B', score: 20 },
       ]);
@@ -211,7 +270,8 @@ describe('leaderboard offline behaviour', () => {
 
       const cached = await fetchTopLeaderboard('regular', { storage });
 
-      expect(cached).toEqual([
+      expect(cached.offline).toBe(true);
+      expect(cached.entries).toEqual([
         { name: 'A', score: 30 },
         { name: 'B', score: 20 },
       ]);

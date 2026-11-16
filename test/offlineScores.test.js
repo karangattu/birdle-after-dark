@@ -117,7 +117,7 @@ describe('offlineScores', () => {
       queuePendingScore(storage, { name: 'A', score: 10, gameMode: 'regular' });
       queuePendingScore(storage, { name: 'B', score: 20, gameMode: 'regular' });
 
-      removePendingScore(storage, { name: 'A', gameMode: 'regular' });
+      removePendingScore(storage, { name: 'A', gameMode: 'regular', score: 10 });
 
       expect(readPendingScores(storage)).toEqual([
         expect.objectContaining({ name: 'B' }),
@@ -146,7 +146,7 @@ describe('offlineScores', () => {
     it('should not throw when storage is unavailable', () => {
       expect(() => queuePendingScore(null, { name: 'A', score: 10, gameMode: 'regular' })).not.toThrow();
       expect(readPendingScores(null)).toEqual([]);
-      expect(writePendingScores(null, [])).toEqual([]);
+      expect(writePendingScores(null, [])).toBe(false);
     });
   });
 

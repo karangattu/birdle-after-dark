@@ -8,12 +8,12 @@ import {
   readPendingScores,
   removePendingScore,
   writeCachedLeaderboard,
-  writePendingScores,
 } from './offlineScores.js';
 
 const TABLE = 'after_dark_leaderboard';
 const TOP_N = 5;
 const FETCH_LIMIT = 50;
+const LEADERBOARD_TIMEOUT_MS = 5000;
 
 let activeChannel = null;
 
@@ -29,61 +29,47 @@ export function isOnline() {
   return navigator.onLine !== false;
 }
 
-function getCachedHighScore(storage, gameMode) {
-  const cached = readCachedLeaderboard(storage, gameMode);
-  return cached.length > 0 ? cached[0].score : 0;
-}
-
-export async function fetchHighScore(gameMode = 'regular', { storage = getDefaultStorage() } = {}) {
-  const supabase = getSupabaseClient();
-  if (!supabase) return getCachedHighScore(storage, gameMode);
-
-  try {
-    const { data, error } = await supabase
-      .from(TABLE)
-      .select('name, score')
-      .eq('game_mode', gameMode)
-      .order('score', { ascending: false })
-      .limit(FETCH_LIMIT);
-
-    if (error) {
-      console.error('[leaderboard] fetchHighScore error:', error.message);
-      return getCachedHighScore(storage, gameMode);
-    }
-
-    const deduped = mergeLeaderboardEntries(data ?? []);
-    writeCachedLeaderboard(storage, gameMode, deduped);
-    return deduped.length > 0 ? deduped[0].score : 0;
-  } catch (err) {
-    console.error('[leaderboard] fetchHighScore exception:', err);
-    return getCachedHighScore(storage, gameMode);
-  }
+export function getOfflineLeaderboard(gameMode, storage) {
+  const pending = readPendingScores(storage).filter(entry => entry.gameMode === gameMode);
+  const entries = pending.length ? mergeLeaderboardEntries(pending) : readCachedLeaderboard(storage, gameMode);
+  return { entries: entries.slice(0, TOP_N), offline: true };
 }
 
 export async function fetchTopLeaderboard(gameMode = 'regular', { storage = getDefaultStorage() } = {}) {
-  const supabase = getSupabaseClient();
-  if (!supabase) return readCachedLeaderboard(storage, gameMode).slice(0, TOP_N);
+  const supabase = isOnline() ? getSupabaseClient() : null;
+  if (!supabase) return getOfflineLeaderboard(gameMode, storage);
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), LEADERBOARD_TIMEOUT_MS);
   try {
     const { data, error } = await supabase
       .from(TABLE)
       .select('name, score')
       .eq('game_mode', gameMode)
       .order('score', { ascending: false })
+      .abortSignal(controller.signal)
       .limit(FETCH_LIMIT);
 
     if (error) {
       console.error('[leaderboard] fetchTopLeaderboard error:', error.message);
-      return readCachedLeaderboard(storage, gameMode).slice(0, TOP_N);
+      return getOfflineLeaderboard(gameMode, storage);
     }
 
-    const deduped = mergeLeaderboardEntries(data ?? []);
-    writeCachedLeaderboard(storage, gameMode, deduped);
-    return deduped.slice(0, TOP_N);
+    const entries = mergeLeaderboardEntries(data ?? []);
+    writeCachedLeaderboard(storage, gameMode, entries);
+    return { entries: entries.slice(0, TOP_N), offline: false };
   } catch (err) {
     console.error('[leaderboard] fetchTopLeaderboard exception:', err);
-    return readCachedLeaderboard(storage, gameMode).slice(0, TOP_N);
+    return getOfflineLeaderboard(gameMode, storage);
+  } finally {
+    clearTimeout(timeout);
   }
+}
+
+export async function fetchHighScore(gameMode = 'regular', { storage = getDefaultStorage() } = {}) {
+  const { entries, offline } = await fetchTopLeaderboard(gameMode, { storage });
+  const globalEntries = offline ? readCachedLeaderboard(storage, gameMode) : entries;
+  return globalEntries[0]?.score ?? 0;
 }
 
 /**
@@ -94,7 +80,7 @@ export async function saveScore(
   name,
   score,
   gameMode = 'regular',
-  { storage = getDefaultStorage() } = {},
+  { storage = getDefaultStorage(), deferUpload = false } = {},
 ) {
   const entry = { name: String(name ?? '').trim(), score: Math.round(Number(score)) || 0, gameMode };
 
@@ -102,15 +88,11 @@ export async function saveScore(
     return { status: 'invalid' };
   }
 
-  if (!isOnline()) {
-    queuePendingScore(storage, entry);
-    return { status: 'queued', reason: 'offline' };
-  }
+  const saveLocally = () => ({ status: queuePendingScore(storage, entry) ? 'queued' : 'error' });
 
-  const supabase = getSupabaseClient();
+  const supabase = !deferUpload && isOnline() ? getSupabaseClient() : null;
   if (!supabase) {
-    queuePendingScore(storage, entry);
-    return { status: 'queued', reason: 'no-client' };
+    return saveLocally();
   }
 
   try {
@@ -122,16 +104,14 @@ export async function saveScore(
 
     if (error) {
       console.error('[leaderboard] saveScore error:', error.message, entry);
-      queuePendingScore(storage, entry);
-      return { status: 'queued', reason: 'error', error: error.message };
+      return saveLocally();
     }
 
     removePendingScore(storage, entry);
     return { status: 'saved', data };
   } catch (err) {
     console.error('[leaderboard] saveScore exception:', err);
-    queuePendingScore(storage, entry);
-    return { status: 'queued', reason: 'exception' };
+    return saveLocally();
   }
 }
 
@@ -156,11 +136,8 @@ export async function flushPendingScores(gameMode = null, { storage = getDefault
   }
 
   let uploaded = 0;
-  const remaining = [];
-
   for (const entry of pending) {
     if (gameMode && entry.gameMode !== gameMode) {
-      remaining.push(entry);
       continue;
     }
 
@@ -171,20 +148,17 @@ export async function flushPendingScores(gameMode = null, { storage = getDefault
 
       if (error) {
         console.error('[leaderboard] flushPendingScores error:', error.message, entry);
-        remaining.push(entry);
         continue;
       }
 
+      removePendingScore(storage, entry);
       uploaded += 1;
     } catch (err) {
       console.error('[leaderboard] flushPendingScores exception:', err);
-      remaining.push(entry);
     }
   }
 
-  writePendingScores(storage, remaining);
-
-  return { uploaded, remaining: remaining.length };
+  return { uploaded, remaining: countPendingScores(storage) };
 }
 
 export function getPendingScoreCount(gameMode = null, { storage = getDefaultStorage() } = {}) {
